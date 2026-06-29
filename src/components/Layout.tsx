@@ -1,28 +1,34 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { Home, FileText, ClipboardCheck, ShieldCheck, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import NotificationPrompt from './NotificationPrompt'
 
 const navItems = [
-  { to: '/', label: 'Home' },
-  { to: '/documents', label: 'Documents' },
-  { to: '/forms', label: 'Forms' },
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/documents', label: 'Documents', icon: FileText },
+  { to: '/forms', label: 'Forms', icon: ClipboardCheck },
 ]
 
 export default function Layout() {
   const { profile, isAdmin, signOut } = useAuth()
 
   return (
-    <div className="min-h-full flex flex-col">
-      <header className="bg-emerald-800 text-white sticky top-0 z-10 shadow">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="font-semibold text-lg tracking-tight">WJ Safety</span>
+    <div className="min-h-full flex flex-col bg-gray-50">
+      <header className="bg-emerald-800 text-white sticky top-0 z-10 shadow-md">
+        <div className="max-w-4xl mx-auto px-4 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={22} className="text-emerald-300" />
+            <span className="font-semibold text-lg tracking-tight">WJ Safety</span>
+          </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="hidden sm:inline opacity-80">{profile?.full_name}</span>
+            <span className="hidden sm:inline text-emerald-100">{profile?.full_name}</span>
             <button
               onClick={signOut}
-              className="bg-emerald-900/60 hover:bg-emerald-900 px-3 py-1.5 rounded-md"
+              aria-label="Sign out"
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition-colors"
             >
-              Sign out
+              <LogOut size={14} />
+              <span>Sign out</span>
             </button>
           </div>
         </div>
@@ -30,36 +36,49 @@ export default function Layout() {
 
       <NotificationPrompt />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 pb-24">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 pb-28">
         <Outlet />
       </main>
 
-      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 flex justify-around py-2 z-10">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `flex flex-col items-center text-xs px-3 py-1 rounded-md ${
-                isActive ? 'text-emerald-700 font-semibold' : 'text-gray-500'
-              }`
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
-        {isAdmin && (
-          <NavLink
-            to="/admin"
-            className={({ isActive }) =>
-              `flex flex-col items-center text-xs px-3 py-1 rounded-md ${
-                isActive ? 'text-emerald-700 font-semibold' : 'text-gray-500'
-              }`
-            }
-          >
-            Admin
-          </NavLink>
-        )}
+      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] z-10 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-w-4xl mx-auto flex justify-around py-1.5">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-0.5 text-xs px-4 py-1.5 rounded-lg min-w-16 font-medium transition-colors ${
+                  isActive ? 'text-emerald-700 bg-emerald-50' : 'text-gray-500'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <item.icon size={20} strokeWidth={isActive ? 2.4 : 2} />
+                  {item.label}
+                </>
+              )}
+            </NavLink>
+          ))}
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-0.5 text-xs px-4 py-1.5 rounded-lg min-w-16 font-medium transition-colors ${
+                  isActive ? 'text-emerald-700 bg-emerald-50' : 'text-gray-500'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <ShieldCheck size={20} strokeWidth={isActive ? 2.4 : 2} />
+                  Admin
+                </>
+              )}
+            </NavLink>
+          )}
+        </div>
       </nav>
     </div>
   )
