@@ -21,11 +21,11 @@ create table profiles (
 create function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id, full_name)
+  insert into public.profiles (id, full_name)
   values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.email));
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 create trigger on_auth_user_created
   after insert on auth.users
@@ -34,17 +34,17 @@ create trigger on_auth_user_created
 create function is_admin()
 returns boolean as $$
   select exists (
-    select 1 from profiles
+    select 1 from public.profiles
     where id = auth.uid() and role in ('admin', 'safety_officer') and status = 'approved'
   );
-$$ language sql security definer stable;
+$$ language sql security definer stable set search_path = public;
 
 create function is_approved()
 returns boolean as $$
   select exists (
-    select 1 from profiles where id = auth.uid() and status = 'approved'
+    select 1 from public.profiles where id = auth.uid() and status = 'approved'
   );
-$$ language sql security definer stable;
+$$ language sql security definer stable set search_path = public;
 
 alter table profiles enable row level security;
 
