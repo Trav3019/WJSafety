@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import NotificationPrompt from './NotificationPrompt'
 
 const navItems = [
   { to: '/', label: 'Home' },
@@ -26,6 +27,8 @@ export default function Layout() {
           </div>
         </div>
       </header>
+
+      <NotificationPrompt />
 
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 pb-24">
         <Outlet />

@@ -61,7 +61,31 @@ load new content) still need a connection.
 
 `npm run build` produces a static `dist/` folder — host it on Netlify,
 Vercel, Cloudflare Pages, or similar. Set the same `VITE_SUPABASE_URL` /
-`VITE_SUPABASE_ANON_KEY` env vars in your hosting provider.
+`VITE_SUPABASE_ANON_KEY` / `VITE_VAPID_PUBLIC_KEY` env vars in your hosting
+provider.
+
+## 7. Push notifications
+
+Workers get a phone notification when the safety officer posts an update, or
+when a form is assigned to them specifically.
+
+1. Generate VAPID keys once: `npx web-push generate-vapid-keys`.
+2. Set `VITE_VAPID_PUBLIC_KEY` (the public key) in `.env` and in your hosting
+   provider's env vars.
+3. Run `supabase/migrations/002_push_notifications.sql` in the SQL editor.
+   Edit the two `alter database ... set app.settings...` lines first:
+   - `app.settings.edge_function_url` → `https://<your-project-ref>.supabase.co/functions/v1/send-push`
+   - `app.settings.edge_function_secret` → any random string you make up
+4. Deploy the edge function: `supabase functions deploy send-push` (requires
+   the Supabase CLI: `npm i -g supabase`, then `supabase link`).
+5. Set the function's secrets so it can sign and send the push messages:
+   ```
+   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... \
+     VAPID_SUBJECT=mailto:you@example.com WEBHOOK_SECRET=<same random string as step 3>
+   ```
+6. In the app, a "Get notified" banner appears once a worker is signed in;
+   tapping Enable subscribes their device. They can be re-prompted any time
+   by clearing site permissions and reloading.
 
 ## Roles
 
