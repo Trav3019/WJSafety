@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { ArrowLeft, FileText, FolderOpen, CloudDownload, CloudCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
@@ -79,34 +80,55 @@ export default function DocumentCategory() {
 
   return (
     <div>
-      <Link to="/documents" className="text-emerald-700 text-sm mb-3 inline-block">
-        ← All categories
+      <Link to="/documents" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
+        <ArrowLeft size={15} />
+        All categories
       </Link>
       <h1 className="text-xl font-bold text-gray-900 mb-4">{categoryName}</h1>
       {loading && <p className="text-gray-500">Loading…</p>}
-      {!loading && docs.length === 0 && <p className="text-gray-500">No documents in this category yet.</p>}
+      {!loading && docs.length === 0 && (
+        <div className="flex flex-col items-center gap-2 text-gray-400 text-sm bg-white border border-gray-100 rounded-xl p-8 text-center">
+          <FolderOpen size={28} className="opacity-50" />
+          No documents in this category yet.
+        </div>
+      )}
       <div className="space-y-2">
         {docs.map((doc) => (
           <div
             key={doc.id}
             onClick={() => openDoc(doc)}
-            className="bg-white border border-gray-100 rounded-lg shadow-sm p-3 flex items-center justify-between cursor-pointer hover:border-emerald-300"
+            className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 flex items-center gap-3 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all"
           >
-            <div>
-              <p className="font-medium text-gray-800">{doc.title}</p>
-              {doc.description && <p className="text-xs text-gray-500">{doc.description}</p>}
+            <div className="bg-emerald-50 text-emerald-700 rounded-full p-2.5 shrink-0">
+              <FileText size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-800 truncate">{doc.title}</p>
+              {doc.description && <p className="text-xs text-gray-500 truncate">{doc.description}</p>}
               <p className="text-xs text-gray-400 mt-0.5">{formatSize(doc.file_size_bytes)}</p>
             </div>
             <button
               onClick={(e) => downloadForOffline(doc, e)}
               disabled={busy === doc.id}
-              className={`text-xs px-2.5 py-1.5 rounded-md shrink-0 ${
+              className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg shrink-0 font-medium transition-colors ${
                 cachedMap[doc.id]
                   ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-gray-100 text-gray-600'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {busy === doc.id ? '…' : cachedMap[doc.id] ? 'Saved offline' : 'Save offline'}
+              {busy === doc.id ? (
+                '…'
+              ) : cachedMap[doc.id] ? (
+                <>
+                  <CloudCheck size={13} />
+                  Saved
+                </>
+              ) : (
+                <>
+                  <CloudDownload size={13} />
+                  Save
+                </>
+              )}
             </button>
           </div>
         ))}

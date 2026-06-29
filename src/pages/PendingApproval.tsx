@@ -1,3 +1,4 @@
+import { Hourglass, ShieldX } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function PendingApproval() {
@@ -5,9 +6,16 @@ export default function PendingApproval() {
   const rejected = profile?.status === 'rejected'
 
   return (
-    <div className="min-h-full flex items-center justify-center px-4 bg-gray-50">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow p-6 text-center">
-        <h1 className="text-xl font-bold text-emerald-800 mb-2">
+    <div className="min-h-full flex items-center justify-center px-4 bg-gradient-to-b from-emerald-800 to-emerald-950">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-7 text-center">
+        <div
+          className={`mx-auto mb-4 rounded-full p-3 w-fit ${
+            rejected ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+          }`}
+        >
+          {rejected ? <ShieldX size={26} /> : <Hourglass size={26} />}
+        </div>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">
           {rejected ? 'Access denied' : 'Awaiting approval'}
         </h1>
         <p className="text-gray-500 text-sm mb-6">
@@ -17,7 +25,7 @@ export default function PendingApproval() {
         </p>
         <button
           onClick={signOut}
-          className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-md px-4 py-2 font-medium"
+          className="w-full bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg py-2.5 font-medium shadow-sm transition-colors"
         >
           Sign out
         </button>

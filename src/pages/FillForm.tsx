@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import SignatureCanvas from 'react-signature-canvas'
+import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { FormAssignment } from '../lib/types'
@@ -84,12 +85,13 @@ export default function FillForm() {
       {form.description && <p className="text-gray-500 text-sm mb-4">{form.description}</p>}
 
       {alreadySubmitted && (
-        <p className="bg-emerald-50 text-emerald-700 text-sm rounded-md p-3 mb-4">
+        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 text-sm rounded-xl p-3.5 mb-4">
+          <CheckCircle2 size={18} className="shrink-0" />
           This form has already been submitted.
-        </p>
+        </div>
       )}
 
-      <div className="space-y-4">
+      <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-4">
         {form.fields.map((field) => (
           <div key={field.id}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -100,7 +102,7 @@ export default function FillForm() {
               <textarea
                 disabled={alreadySubmitted}
                 onChange={(e) => setAnswer(field.id, e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-gray-50"
                 rows={3}
               />
             )}
@@ -108,7 +110,7 @@ export default function FillForm() {
               <input
                 disabled={alreadySubmitted}
                 onChange={(e) => setAnswer(field.id, e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-gray-50"
               />
             )}
             {field.type === 'date' && (
@@ -116,14 +118,14 @@ export default function FillForm() {
                 type="date"
                 disabled={alreadySubmitted}
                 onChange={(e) => setAnswer(field.id, e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-gray-50"
               />
             )}
             {field.type === 'select' && (
               <select
                 disabled={alreadySubmitted}
                 onChange={(e) => setAnswer(field.id, e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-gray-50"
               >
                 <option value="">Select…</option>
                 {field.options?.map((opt) => (
@@ -149,7 +151,7 @@ export default function FillForm() {
         {form.requires_signature && !alreadySubmitted && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Signature *</label>
-            <div className="border border-gray-300 rounded-md bg-white">
+            <div className="border border-gray-300 rounded-lg bg-white overflow-hidden">
               <SignatureCanvas
                 ref={sigRef}
                 canvasProps={{ className: 'w-full', style: { width: '100%', height: 150 } }}
@@ -171,7 +173,7 @@ export default function FillForm() {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-md py-2.5 font-medium"
+            className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-lg py-2.5 font-medium shadow-sm transition-colors"
           >
             {submitting ? 'Submitting…' : 'Submit & Sign'}
           </button>
