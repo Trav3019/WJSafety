@@ -37,7 +37,7 @@ export default function Layout() {
         <div className="max-w-4xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck size={22} className="text-emerald-300" />
-            <span className="font-semibold text-lg tracking-tight">WJ Siemens Farming</span>
+            <span className="font-semibold text-lg tracking-tight">WJ Safety</span>
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden sm:inline text-emerald-100">{profile?.full_name}</span>

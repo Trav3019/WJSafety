@@ -14,9 +14,9 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
       },
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'WJ Siemens Farming',
+        name: 'WJ Safety',
         short_name: 'WJ Safety',
         description: 'Farm safety documents, SDS, and forms for WJ Siemens Farming Co Ltd',
         theme_color: '#065f46',
@@ -25,7 +25,8 @@ export default defineConfig({
         start_url: '/',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: 'apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
         ],
       },
     }),
