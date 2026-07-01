@@ -15,7 +15,7 @@ function formatSize(bytes: number | null) {
 function DocViewer({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
   function download() {
     const a = document.createElement('a')
-    a.href = url
+    a.href = url.split('#')[0]
     a.download = title
     document.body.appendChild(a)
     a.click()
@@ -89,7 +89,7 @@ export default function DocumentCategory() {
         await cacheFile(doc.storage_path, blob)
         setCachedMap((m) => ({ ...m, [doc.id]: true }))
       }
-      const url = URL.createObjectURL(blob)
+      const url = URL.createObjectURL(blob) + '#zoom=page-fit'
       setViewer({ url, title: doc.title || 'Document' })
     } finally {
       setBusy(null)
@@ -97,7 +97,7 @@ export default function DocumentCategory() {
   }
 
   function closeViewer() {
-    if (viewer) URL.revokeObjectURL(viewer.url)
+    if (viewer) URL.revokeObjectURL(viewer.url.split('#')[0])
     setViewer(null)
   }
 
