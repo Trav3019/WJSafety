@@ -74,9 +74,11 @@ export interface FormSubmission {
 
 export interface NewsPost {
   id: string
-  title: string
+  title: string | null
   body: string
   posted_by: string | null
   pinned: boolean
+  image_path: string | null
   created_at: string
+  profiles?: { full_name: string } | null
 }
