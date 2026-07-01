@@ -8,9 +8,18 @@ export default function NotificationPrompt() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!pushSupported() || Notification.permission !== 'default') return
-    getExistingSubscription().then((sub) => setVisible(!sub))
-  }, [])
+    if (!pushSupported() || !profile) return
+    if (Notification.permission === 'granted') {
+      // Already allowed — silently register if not already subscribed
+      getExistingSubscription().then((sub) => {
+        if (!sub) subscribeToPush(profile.id).catch(() => null)
+      })
+      return
+    }
+    if (Notification.permission === 'default') {
+      getExistingSubscription().then((sub) => setVisible(!sub))
+    }
+  }, [profile?.id])
 
   async function enable() {
     if (!profile) return
