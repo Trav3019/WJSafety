@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Pin, ImagePlus, Send, Trash2, X, MessageCircle } from 'lucide-react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { Pin, ImagePlus, Send, Trash2, X, MessageCircle, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { NewsPost, PostComment } from '../lib/types'
@@ -133,11 +133,15 @@ export default function Home() {
   const { profile, isAdmin } = useAuth()
   const [posts, setPosts] = useState<NewsPost[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [body, setBody] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [posting, setPosting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const pullStartY = useRef(0)
+  const pullDelta = useRef(0)
+  const [pullDistance, setPullDistance] = useState(0)
 
   async function loadPosts() {
     const { data } = await supabase
@@ -150,6 +154,30 @@ export default function Home() {
   }
 
   useEffect(() => { loadPosts() }, [])
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (window.scrollY === 0) pullStartY.current = e.touches[0].clientY
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (pullStartY.current === 0) return
+    const delta = e.touches[0].clientY - pullStartY.current
+    if (delta > 0 && window.scrollY === 0) {
+      pullDelta.current = Math.min(delta, 80)
+      setPullDistance(pullDelta.current)
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(async () => {
+    if (pullDelta.current > 60) {
+      setRefreshing(true)
+      await loadPosts()
+      setRefreshing(false)
+    }
+    pullStartY.current = 0
+    pullDelta.current = 0
+    setPullDistance(0)
+  }, [])
 
   function pickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
@@ -205,7 +233,24 @@ export default function Home() {
     supabase.storage.from('post-images').getPublicUrl(path).data.publicUrl
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div
+      className="max-w-xl mx-auto"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull to refresh indicator */}
+      <div
+        className="flex items-center justify-center overflow-hidden transition-all duration-200"
+        style={{ height: pullDistance > 0 ? pullDistance : refreshing ? 48 : 0 }}
+      >
+        <RefreshCw
+          size={20}
+          className={`text-emerald-600 ${refreshing ? 'animate-spin' : ''}`}
+          style={{ transform: `rotate(${pullDistance * 3}deg)` }}
+        />
+      </div>
+
       <h1 className="text-xl font-bold text-gray-900 mb-1">Safety Feed</h1>
       <p className="text-sm text-gray-500 mb-4">Share updates, photos, and reminders with the team.</p>
 
