@@ -56,10 +56,10 @@ export default function DocumentCategory() {
         setCachedMap((m) => ({ ...m, [doc.id]: true }))
       }
       const url = URL.createObjectURL(blob)
+      // On iOS Safari blob URLs can't open in new tab — force a download instead
       const a = document.createElement('a')
       a.href = url
-      a.target = '_blank'
-      a.rel = 'noopener noreferrer'
+      a.download = doc.title || 'document'
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
