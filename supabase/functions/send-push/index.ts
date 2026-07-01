@@ -32,8 +32,8 @@ Deno.serve(async (req) => {
   let query = supabase.from('push_subscriptions').select('*')
 
   if (payload.type === 'news_post') {
-    title = 'New safety update'
-    body = payload.title
+    title = `New post from ${payload.poster_name}`
+    body = payload.body
   } else if (payload.type === 'form_assigned') {
     title = 'New form to sign'
     body = payload.title
