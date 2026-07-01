@@ -1,7 +1,10 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Home, FileText, ClipboardCheck, ShieldCheck, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import NotificationPrompt from './NotificationPrompt'
+import { supabase } from '../lib/supabase'
+import { cacheFile, isCached } from '../lib/offlineDb'
 
 const navItems = [
   { to: '/', label: 'Home', icon: Home },
@@ -9,8 +12,24 @@ const navItems = [
   { to: '/forms', label: 'Forms', icon: ClipboardCheck },
 ]
 
+async function syncAllDocumentsOffline() {
+  const { data: docs } = await supabase.from('documents').select('storage_path')
+  if (!docs) return
+  for (const doc of docs) {
+    if (await isCached(doc.storage_path)) continue
+    const { data } = await supabase.storage.from('documents').download(doc.storage_path)
+    if (data) await cacheFile(doc.storage_path, data)
+  }
+}
+
 export default function Layout() {
   const { profile, isAdmin, signOut } = useAuth()
+
+  useEffect(() => {
+    if (profile?.status === 'approved') {
+      syncAllDocumentsOffline()
+    }
+  }, [profile?.id])
 
   return (
     <div className="min-h-full flex flex-col bg-gray-50">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, FolderOpen, CloudDownload, CloudCheck } from 'lucide-react'
+import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
@@ -107,29 +107,24 @@ export default function DocumentCategory() {
               {doc.description && <p className="text-xs text-gray-500 truncate">{doc.description}</p>}
               <p className="text-xs text-gray-400 mt-0.5">{formatSize(doc.file_size_bytes)}</p>
             </div>
-            <button
-              onClick={(e) => downloadForOffline(doc, e)}
-              disabled={busy === doc.id}
-              className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg shrink-0 font-medium transition-colors ${
-                cachedMap[doc.id]
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
+            <div className="shrink-0">
               {busy === doc.id ? (
-                '…'
+                <span className="text-xs text-gray-400">…</span>
               ) : cachedMap[doc.id] ? (
-                <>
-                  <CloudCheck size={13} />
-                  Saved
-                </>
+                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                  <CloudCheck size={14} />
+                  Offline
+                </span>
               ) : (
-                <>
-                  <CloudDownload size={13} />
-                  Save
-                </>
+                <button
+                  onClick={(e) => downloadForOffline(doc, e)}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-emerald-600 transition-colors"
+                  title="Save for offline"
+                >
+                  <CloudDownload size={14} />
+                </button>
               )}
-            </button>
+            </div>
           </div>
         ))}
       </div>
