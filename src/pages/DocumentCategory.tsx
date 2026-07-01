@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload } from 'lucide-react'
+import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload, X, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
@@ -12,6 +12,39 @@ function formatSize(bytes: number | null) {
   return `${(kb / 1024).toFixed(1)} MB`
 }
 
+function DocViewer({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
+  function download() {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = title
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="flex items-center justify-between bg-emerald-800 text-white px-4 py-3 shrink-0">
+        <span className="text-sm font-medium truncate flex-1 mr-3">{title}</span>
+        <div className="flex items-center gap-3">
+          <button onClick={download} aria-label="Download" className="text-white/80 hover:text-white">
+            <Download size={18} />
+          </button>
+          <button onClick={onClose} aria-label="Close" className="text-white/80 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+      <iframe
+        src={url}
+        title={title}
+        className="flex-1 w-full border-0 bg-white"
+        allow="fullscreen"
+      />
+    </div>
+  )
+}
+
 export default function DocumentCategory() {
   const { categoryId } = useParams()
   const location = useLocation()
@@ -20,6 +53,7 @@ export default function DocumentCategory() {
   const [loading, setLoading] = useState(true)
   const [cachedMap, setCachedMap] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null)
 
   useEffect(() => {
     if (!categoryId) return
@@ -56,17 +90,15 @@ export default function DocumentCategory() {
         setCachedMap((m) => ({ ...m, [doc.id]: true }))
       }
       const url = URL.createObjectURL(blob)
-      // On iOS Safari blob URLs can't open in new tab — force a download instead
-      const a = document.createElement('a')
-      a.href = url
-      a.download = doc.title || 'document'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(url), 10000)
+      setViewer({ url, title: doc.title || 'Document' })
     } finally {
       setBusy(null)
     }
+  }
+
+  function closeViewer() {
+    if (viewer) URL.revokeObjectURL(viewer.url)
+    setViewer(null)
   }
 
   async function downloadForOffline(doc: SafetyDocument, e: React.MouseEvent) {
@@ -86,55 +118,58 @@ export default function DocumentCategory() {
   }
 
   return (
-    <div>
-      <Link to="/documents" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
-        <ArrowLeft size={15} />
-        All categories
-      </Link>
-      <h1 className="text-xl font-bold text-gray-900 mb-4">{categoryName}</h1>
-      {loading && <p className="text-gray-500">Loading…</p>}
-      {!loading && docs.length === 0 && (
-        <div className="flex flex-col items-center gap-2 text-gray-400 text-sm bg-white border border-gray-100 rounded-xl p-8 text-center">
-          <FolderOpen size={28} className="opacity-50" />
-          No documents in this category yet.
-        </div>
-      )}
-      <div className="space-y-2">
-        {docs.map((doc) => (
-          <div
-            key={doc.id}
-            onClick={() => openDoc(doc)}
-            className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 flex items-center gap-3 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all"
-          >
-            <div className="bg-emerald-50 text-emerald-700 rounded-full p-2.5 shrink-0">
-              <FileText size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-800 truncate">{doc.title}</p>
-              {doc.description && <p className="text-xs text-gray-500 truncate">{doc.description}</p>}
-              <p className="text-xs text-gray-400 mt-0.5">{formatSize(doc.file_size_bytes)}</p>
-            </div>
-            <div className="shrink-0">
-              {busy === doc.id ? (
-                <span className="text-xs text-gray-400">…</span>
-              ) : cachedMap[doc.id] ? (
-                <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                  <CloudCheck size={14} />
-                  Offline
-                </span>
-              ) : (
-                <button
-                  onClick={(e) => downloadForOffline(doc, e)}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-emerald-600 transition-colors"
-                  title="Save for offline"
-                >
-                  <CloudDownload size={14} />
-                </button>
-              )}
-            </div>
+    <>
+      {viewer && <DocViewer url={viewer.url} title={viewer.title} onClose={closeViewer} />}
+      <div>
+        <Link to="/documents" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
+          <ArrowLeft size={15} />
+          All categories
+        </Link>
+        <h1 className="text-xl font-bold text-gray-900 mb-4">{categoryName}</h1>
+        {loading && <p className="text-gray-500">Loading…</p>}
+        {!loading && docs.length === 0 && (
+          <div className="flex flex-col items-center gap-2 text-gray-400 text-sm bg-white border border-gray-100 rounded-xl p-8 text-center">
+            <FolderOpen size={28} className="opacity-50" />
+            No documents in this category yet.
           </div>
-        ))}
+        )}
+        <div className="space-y-2">
+          {docs.map((doc) => (
+            <div
+              key={doc.id}
+              onClick={() => openDoc(doc)}
+              className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 flex items-center gap-3 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all"
+            >
+              <div className="bg-emerald-50 text-emerald-700 rounded-full p-2.5 shrink-0">
+                <FileText size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-800 truncate">{doc.title}</p>
+                {doc.description && <p className="text-xs text-gray-500 truncate">{doc.description}</p>}
+                <p className="text-xs text-gray-400 mt-0.5">{formatSize(doc.file_size_bytes)}</p>
+              </div>
+              <div className="shrink-0">
+                {busy === doc.id ? (
+                  <span className="text-xs text-gray-400">…</span>
+                ) : cachedMap[doc.id] ? (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                    <CloudCheck size={14} />
+                    Offline
+                  </span>
+                ) : (
+                  <button
+                    onClick={(e) => downloadForOffline(doc, e)}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-emerald-600 transition-colors"
+                    title="Save for offline"
+                  >
+                    <CloudDownload size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
