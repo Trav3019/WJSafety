@@ -16,9 +16,9 @@ export default defineConfig({
       },
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'WJ Safety',
+        name: 'WJ Siemens Farming',
         short_name: 'WJ Safety',
-        description: 'Farm safety documents, SDS, and forms',
+        description: 'Farm safety documents, SDS, and forms for WJ Siemens Farming Co Ltd',
         theme_color: '#065f46',
         background_color: '#ffffff',
         display: 'standalone',
