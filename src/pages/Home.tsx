@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pin, ImagePlus, Send, Trash2, X } from 'lucide-react'
+import { Pin, ImagePlus, Send, Trash2, X, MessageCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { NewsPost } from '../lib/types'
+import type { NewsPost, PostComment } from '../lib/types'
 import { formatDistanceToNow } from 'date-fns'
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, small }: { name: string; small?: boolean }) {
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -14,9 +14,117 @@ function Avatar({ name }: { name: string }) {
     .toUpperCase()
   const colors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-rose-500', 'bg-teal-500']
   const color = colors[name.charCodeAt(0) % colors.length]
+  const size = small ? 'w-7 h-7 text-xs' : 'w-10 h-10 text-sm'
   return (
-    <div className={`${color} text-white rounded-full w-10 h-10 flex items-center justify-center font-semibold text-sm shrink-0`}>
+    <div className={`${color} ${size} text-white rounded-full flex items-center justify-center font-semibold shrink-0`}>
       {initials}
+    </div>
+  )
+}
+
+function CommentSection({ postId }: { postId: string }) {
+  const { profile, isAdmin } = useAuth()
+  const [comments, setComments] = useState<PostComment[]>([])
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  async function loadComments() {
+    const { data } = await supabase
+      .from('post_comments')
+      .select('*, profiles(full_name)')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+    setComments((data as unknown as PostComment[]) ?? [])
+  }
+
+  useEffect(() => {
+    if (open) loadComments()
+  }, [open])
+
+  async function submitComment(e: React.FormEvent) {
+    e.preventDefault()
+    if (!body.trim()) return
+    setSending(true)
+    await supabase.from('post_comments').insert({
+      post_id: postId,
+      commented_by: profile?.id,
+      body: body.trim(),
+    })
+    setBody('')
+    setSending(false)
+    loadComments()
+  }
+
+  async function deleteComment(id: string) {
+    await supabase.from('post_comments').delete().eq('id', id)
+    loadComments()
+  }
+
+  return (
+    <div className="border-t border-gray-100">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-emerald-700 px-4 py-2.5 transition-colors w-full"
+      >
+        <MessageCircle size={14} />
+        {open ? 'Hide comments' : `Comments`}
+      </button>
+
+      {open && (
+        <div className="px-4 pb-3 space-y-3">
+          {comments.length === 0 && (
+            <p className="text-xs text-gray-400">No comments yet — be the first!</p>
+          )}
+          {comments.map((c) => {
+            const name = c.profiles?.full_name ?? 'Unknown'
+            const canDelete = isAdmin || c.commented_by === profile?.id
+            return (
+              <div key={c.id} className="flex gap-2">
+                <Avatar name={name} small />
+                <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2">
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-xs font-semibold text-gray-800">{name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">
+                      {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-700 mt-0.5 whitespace-pre-wrap">{c.body}</p>
+                </div>
+                {canDelete && (
+                  <button
+                    onClick={() => deleteComment(c.id)}
+                    className="text-gray-300 hover:text-red-400 transition-colors self-start mt-1"
+                    aria-label="Delete comment"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+
+          <form onSubmit={submitComment} className="flex gap-2 pt-1">
+            {profile && <Avatar name={profile.full_name} small />}
+            <div className="flex-1 flex items-center gap-2 bg-gray-50 rounded-full px-3 py-1.5">
+              <input
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Write a comment…"
+                className="flex-1 text-xs bg-transparent focus:outline-none text-gray-800 placeholder-gray-400"
+              />
+              <button
+                type="submit"
+                disabled={sending || !body.trim()}
+                className="text-emerald-600 disabled:opacity-30 transition-opacity"
+                aria-label="Send comment"
+              >
+                <Send size={13} />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
@@ -164,6 +272,7 @@ export default function Home() {
               key={post.id}
               className={`bg-white rounded-xl shadow-sm border ${post.pinned ? 'border-amber-200' : 'border-gray-100'}`}
             >
+              {/* Header */}
               <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
                 <div className="flex items-center gap-2.5">
                   <Avatar name={authorName} />
@@ -202,10 +311,12 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Body */}
               {post.body && (
                 <p className="px-4 pb-3 text-gray-800 text-sm whitespace-pre-wrap">{post.body}</p>
               )}
 
+              {/* Image */}
               {post.image_path && (
                 <img
                   src={getImageUrl(post.image_path)}
@@ -215,7 +326,8 @@ export default function Home() {
                 />
               )}
 
-              <div className="h-3" />
+              {/* Comments */}
+              <CommentSection postId={post.id} />
             </article>
           )
         })}

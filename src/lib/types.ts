@@ -72,6 +72,15 @@ export interface FormSubmission {
   submitted_at: string
 }
 
+export interface PostComment {
+  id: string
+  post_id: string
+  commented_by: string
+  body: string
+  created_at: string
+  profiles?: { full_name: string } | null
+}
+
 export interface NewsPost {
   id: string
   title: string | null
