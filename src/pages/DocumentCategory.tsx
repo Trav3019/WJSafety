@@ -1,48 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload, X, Download } from 'lucide-react'
+import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
+import PdfViewer from '../components/PdfViewer'
 
 function formatSize(bytes: number | null) {
   if (!bytes) return ''
   const kb = bytes / 1024
   if (kb < 1024) return `${kb.toFixed(0)} KB`
   return `${(kb / 1024).toFixed(1)} MB`
-}
-
-function DocViewer({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
-  function download() {
-    const a = document.createElement('a')
-    a.href = url.split('#')[0]
-    a.download = title
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      <div className="flex items-center justify-between bg-emerald-800 text-white px-4 py-3 shrink-0">
-        <span className="text-sm font-medium truncate flex-1 mr-3">{title}</span>
-        <div className="flex items-center gap-3">
-          <button onClick={download} aria-label="Download" className="text-white/80 hover:text-white">
-            <Download size={18} />
-          </button>
-          <button onClick={onClose} aria-label="Close" className="text-white/80 hover:text-white">
-            <X size={20} />
-          </button>
-        </div>
-      </div>
-      <iframe
-        src={url}
-        title={title}
-        className="flex-1 w-full border-0 bg-white"
-        allow="fullscreen"
-      />
-    </div>
-  )
 }
 
 export default function DocumentCategory() {
@@ -89,7 +57,7 @@ export default function DocumentCategory() {
         await cacheFile(doc.storage_path, blob)
         setCachedMap((m) => ({ ...m, [doc.id]: true }))
       }
-      const url = URL.createObjectURL(blob) + '#zoom=page-fit'
+      const url = URL.createObjectURL(blob)
       setViewer({ url, title: doc.title || 'Document' })
     } finally {
       setBusy(null)
@@ -97,7 +65,7 @@ export default function DocumentCategory() {
   }
 
   function closeViewer() {
-    if (viewer) URL.revokeObjectURL(viewer.url.split('#')[0])
+    if (viewer) URL.revokeObjectURL(viewer.url)
     setViewer(null)
   }
 
@@ -119,7 +87,7 @@ export default function DocumentCategory() {
 
   return (
     <>
-      {viewer && <DocViewer url={viewer.url} title={viewer.title} onClose={closeViewer} />}
+      {viewer && <PdfViewer url={viewer.url} title={viewer.title} onClose={closeViewer} />}
       <div>
         <Link to="/documents" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
           <ArrowLeft size={15} />
