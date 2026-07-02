@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload } from 'lucide-react'
+import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
@@ -20,6 +20,7 @@ export default function DocumentCategory() {
   const location = useLocation()
   const categoryName = (location.state as { name?: string } | null)?.name ?? 'Documents'
   const [docs, setDocs] = useState<SafetyDocument[]>([])
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(!localStorage.getItem(`wjs_docs_${categoryId ?? ''}`))
   const [cachedMap, setCachedMap] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<string | null>(null)
@@ -130,6 +131,27 @@ export default function DocumentCategory() {
           All categories
         </Link>
         <h1 className="text-xl font-bold text-gray-900 mb-4">{categoryName}</h1>
+
+        {/* Search bar */}
+        <div className="relative mb-4">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Search documents…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
         {loading && <p className="text-gray-500">Loading…</p>}
         {!loading && docs.length === 0 && (
           <div className="flex flex-col items-center gap-2 text-gray-400 text-sm bg-white border border-gray-100 rounded-xl p-8 text-center">
@@ -138,7 +160,11 @@ export default function DocumentCategory() {
           </div>
         )}
         <div className="space-y-2">
-          {docs.map((doc) => (
+          {docs.filter((doc) => {
+            if (!search.trim()) return true
+            const q = search.toLowerCase()
+            return doc.title?.toLowerCase().includes(q) || doc.description?.toLowerCase().includes(q)
+          }).map((doc) => (
             <div
               key={doc.id}
               onClick={() => openDoc(doc)}
