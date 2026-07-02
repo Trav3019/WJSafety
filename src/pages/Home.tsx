@@ -383,7 +383,7 @@ export default function Home() {
               )}
 
               {/* Comments */}
-              <CommentSection postId={post.id} postedBy={post.posted_by} />
+              <CommentSection postId={post.id} postedBy={post.posted_by ?? ''} />
             </article>
           )
         })}
