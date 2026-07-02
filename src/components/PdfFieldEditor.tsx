@@ -5,7 +5,7 @@ import { Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
-export type FieldType = 'signature' | 'initials' | 'date'
+export type FieldType = 'signature' | 'initials' | 'date' | 'text'
 
 export interface PlacedField {
   id: string
@@ -22,16 +22,19 @@ const FIELD_COLORS: Record<FieldType, string> = {
   signature: 'rgba(16,185,129,0.25)',
   initials:  'rgba(59,130,246,0.25)',
   date:      'rgba(245,158,11,0.25)',
+  text:      'rgba(139,92,246,0.25)',
 }
 const FIELD_BORDER: Record<FieldType, string> = {
   signature: '#10b981',
   initials:  '#3b82f6',
   date:      '#f59e0b',
+  text:      '#8b5cf6',
 }
 const FIELD_LABELS: Record<FieldType, string> = {
   signature: 'Signature',
   initials:  'Initials',
   date:      'Date',
+  text:      'Text',
 }
 
 // Default sizes relative to page
@@ -39,6 +42,7 @@ const FIELD_SIZES: Record<FieldType, { w: number; h: number }> = {
   signature: { w: 0.28, h: 0.06 },
   initials:  { w: 0.14, h: 0.05 },
   date:      { w: 0.18, h: 0.04 },
+  text:      { w: 0.35, h: 0.04 },
 }
 
 interface Props {
@@ -113,7 +117,7 @@ export default function PdfFieldEditor({ pdfUrl, fields, onChange }: Props) {
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-gray-500 font-medium mr-1">Place:</span>
-        {(['signature', 'initials', 'date'] as FieldType[]).map((t) => (
+        {(['signature', 'initials', 'date', 'text'] as FieldType[]).map((t) => (
           <button
             key={t}
             type="button"

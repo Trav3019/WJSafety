@@ -13,7 +13,7 @@ interface SignField {
   y: number
   width: number
   height: number
-  type: 'signature' | 'initials' | 'date'
+  type: 'signature' | 'initials' | 'date' | 'text'
   label: string
   sort_order: number
 }
@@ -29,6 +29,7 @@ const TYPE_COLORS = {
   signature: 'border-emerald-400 bg-emerald-50 text-emerald-700',
   initials:  'border-blue-400 bg-blue-50 text-blue-700',
   date:      'border-amber-400 bg-amber-50 text-amber-700',
+  text:      'border-violet-400 bg-violet-50 text-violet-700',
 }
 
 function dataURLtoUint8Array(dataUrl: string): Uint8Array {
@@ -44,6 +45,7 @@ export default function SignDoc() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const sigRef = useRef<SignatureCanvasHandle>(null)
+  const textInputRef = useRef<HTMLInputElement>(null)
 
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
@@ -54,6 +56,7 @@ export default function SignDoc() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeField, setActiveField] = useState<SignField | null>(null)
+  const [textDraft, setTextDraft] = useState('')
 
   useEffect(() => {
     if (!assignmentId) return
@@ -94,6 +97,10 @@ export default function SignDoc() {
   function handleFieldTap(f: SignField) {
     if (f.type === 'date') {
       setValues((v) => ({ ...v, [f.id]: new Date().toLocaleDateString() }))
+    } else if (f.type === 'text') {
+      setTextDraft(values[f.id] ?? '')
+      setActiveField(f)
+      setTimeout(() => textInputRef.current?.focus(), 100)
     } else {
       setActiveField(f)
     }
@@ -103,6 +110,13 @@ export default function SignDoc() {
     if (!activeField || sigRef.current?.isEmpty()) return
     setValues((v) => ({ ...v, [activeField.id]: sigRef.current!.toDataURL() }))
     setActiveField(null)
+  }
+
+  function confirmText() {
+    if (!activeField || !textDraft.trim()) return
+    setValues((v) => ({ ...v, [activeField.id]: textDraft.trim() }))
+    setActiveField(null)
+    setTextDraft('')
   }
 
   const allFilled = fields.length === 0 || fields.every((f) => !!values[f.id])
@@ -123,8 +137,9 @@ export default function SignDoc() {
         const y = (1 - field.y - field.height) * ph
         const w = field.width * pw
         const h = field.height * ph
-        if (field.type === 'date') {
-          pdfPage.drawText(val, { x: x + 4, y: y + h / 2 - 5, size: Math.min(h * 0.55, 12), color: rgb(0.05, 0.37, 0.25) })
+        if (field.type === 'date' || field.type === 'text') {
+          const color = field.type === 'text' ? rgb(0.27, 0.18, 0.62) : rgb(0.05, 0.37, 0.25)
+          pdfPage.drawText(val, { x: x + 4, y: y + h / 2 - 5, size: Math.min(h * 0.55, 12), color })
         } else {
           const img = await pdfLibDoc.embedPng(dataURLtoUint8Array(val))
           pdfPage.drawImage(img, { x, y, width: w, height: h })
@@ -155,29 +170,53 @@ export default function SignDoc() {
 
   const alreadySigned = assignment.status === 'signed'
   const completedCount = fields.filter((f) => !!values[f.id]).length
+  const isTextField = activeField?.type === 'text'
 
   return (
     <>
-      {/* Signature modal */}
+      {/* Field modal — signature/initials or text input */}
       {activeField && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
           <div className="bg-white w-full rounded-t-2xl p-5 space-y-3">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-gray-800">{activeField.label}</p>
-              <button onClick={() => setActiveField(null)}><X size={20} className="text-gray-400" /></button>
+              <button onClick={() => { setActiveField(null); setTextDraft('') }}><X size={20} className="text-gray-400" /></button>
             </div>
-            <div className="border border-gray-200 rounded-xl overflow-hidden h-36 bg-white">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
-                <span>Draw your {activeField.type}</span>
-                <button onClick={() => sigRef.current?.clear()} className="flex items-center gap-1 hover:text-gray-700">
-                  <RotateCcw size={11} /> Clear
+
+            {isTextField ? (
+              <div className="space-y-3">
+                <input
+                  ref={textInputRef}
+                  value={textDraft}
+                  onChange={(e) => setTextDraft(e.target.value)}
+                  placeholder={`Enter ${activeField.label.toLowerCase()}…`}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  onKeyDown={(e) => e.key === 'Enter' && confirmText()}
+                />
+                <button
+                  onClick={confirmText}
+                  disabled={!textDraft.trim()}
+                  className="w-full bg-violet-600 disabled:opacity-40 text-white rounded-xl py-3 font-medium"
+                >
+                  Confirm
                 </button>
               </div>
-              <div className="h-28"><SignatureCanvas ref={sigRef} /></div>
-            </div>
-            <button onClick={confirmSignature} className="w-full bg-emerald-700 text-white rounded-xl py-3 font-medium">
-              Confirm
-            </button>
+            ) : (
+              <>
+                <div className="border border-gray-200 rounded-xl overflow-hidden h-36 bg-white">
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
+                    <span>Draw your {activeField.type}</span>
+                    <button onClick={() => sigRef.current?.clear()} className="flex items-center gap-1 hover:text-gray-700">
+                      <RotateCcw size={11} /> Clear
+                    </button>
+                  </div>
+                  <div className="h-28"><SignatureCanvas ref={sigRef} /></div>
+                </div>
+                <button onClick={confirmSignature} className="w-full bg-emerald-700 text-white rounded-xl py-3 font-medium">
+                  Confirm
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -217,11 +256,15 @@ export default function SignDoc() {
                   {fields.map((f) => {
                     const filled = !!values[f.id]
                     const colors = TYPE_COLORS[f.type]
+                    const borderColor = colors.includes('emerald') ? 'border-emerald-400'
+                      : colors.includes('blue') ? 'border-blue-400'
+                      : colors.includes('violet') ? 'border-violet-400'
+                      : 'border-amber-400'
                     return (
                       <button
                         key={f.id}
                         type="button"
-                        onClick={() => !filled && handleFieldTap(f)}
+                        onClick={() => handleFieldTap(f)}
                         className={`w-full flex items-center gap-3 border rounded-xl px-4 py-3 text-left transition-all ${
                           filled ? 'border-gray-200 bg-white' : `${colors} border-2`
                         }`}
@@ -229,18 +272,18 @@ export default function SignDoc() {
                         <div className="shrink-0">
                           {filled
                             ? <CheckCircle2 size={20} className="text-emerald-500" />
-                            : <div className={`w-5 h-5 rounded-full border-2 ${colors.includes('emerald') ? 'border-emerald-400' : colors.includes('blue') ? 'border-blue-400' : 'border-amber-400'}`} />
+                            : <div className={`w-5 h-5 rounded-full border-2 ${borderColor}`} />
                           }
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-800">{f.label}</p>
                           <p className="text-xs text-gray-400 capitalize">{f.type} · Page {f.page}</p>
                         </div>
-                        {filled && f.type !== 'date' && values[f.id]?.startsWith('data:') && (
-                          <img src={values[f.id]} alt="signature" className="h-8 object-contain" />
+                        {filled && (f.type === 'date' || f.type === 'text') && (
+                          <span className="text-sm text-gray-600 truncate max-w-[40%]">{values[f.id]}</span>
                         )}
-                        {filled && f.type === 'date' && (
-                          <span className="text-sm text-gray-600">{values[f.id]}</span>
+                        {filled && (f.type === 'signature' || f.type === 'initials') && values[f.id]?.startsWith('data:') && (
+                          <img src={values[f.id]} alt="signature" className="h-8 object-contain" />
                         )}
                         {!filled && (
                           <span className="text-xs font-medium opacity-70">Tap to fill</span>
