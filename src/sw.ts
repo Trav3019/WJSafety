@@ -1,9 +1,13 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching'
+import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching'
+import { registerRoute, NavigationRoute } from 'workbox-routing'
 
 declare let self: ServiceWorkerGlobalScope
 
 precacheAndRoute(self.__WB_MANIFEST)
+
+// Serve index.html for all page navigations so SPA routing works offline
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html')))
 
 self.addEventListener('push', (event) => {
   let data: { title?: string; body?: string } = {}

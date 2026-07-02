@@ -22,14 +22,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   async function loadProfile(userId: string) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    setProfile(data ?? null)
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      if (data && !error) {
+        setProfile(data)
+        localStorage.setItem('wjs_profile', JSON.stringify(data))
+        return
+      }
+    } catch {
+      // network error — fall through to cached profile
+    }
+    const cached = localStorage.getItem('wjs_profile')
+    if (cached) {
+      try { setProfile(JSON.parse(cached)) } catch { /* ignore */ }
+    }
   }
 
   useEffect(() => {
+    // 4-second timeout so the app doesn't hang indefinitely when offline
+    const offlineTimer = setTimeout(() => {
+      const cached = localStorage.getItem('wjs_profile')
+      if (cached) {
+        try { setProfile(JSON.parse(cached)) } catch { /* ignore */ }
+      }
+      setLoading(false)
+    }, 4000)
+
     supabase.auth.getSession().then(({ data }) => {
+      clearTimeout(offlineTimer)
       setSession(data.session)
-      if (data.session) loadProfile(data.session.user.id)
+      if (data.session) loadProfile(data.session.user.id).finally(() => setLoading(false))
+      else setLoading(false)
+    }).catch(() => {
+      clearTimeout(offlineTimer)
+      const cached = localStorage.getItem('wjs_profile')
+      if (cached) {
+        try { setProfile(JSON.parse(cached)) } catch { /* ignore */ }
+      }
       setLoading(false)
     })
 
@@ -60,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    localStorage.removeItem('wjs_profile')
     await supabase.auth.signOut()
   }
 
