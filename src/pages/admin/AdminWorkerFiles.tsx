@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Clock, UserRound, Download } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, UserRound, Download, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../lib/types'
 
@@ -59,6 +59,20 @@ function WorkerDetail() {
     document.body.removeChild(a)
   }
 
+  async function deleteSignAssignment(s: SignAssignment) {
+    if (!confirm(`Delete "${s.sign_requests?.title}" from this worker's file?`)) return
+    if (s.signed_pdf_path) await supabase.storage.from('signed-pdfs').remove([s.signed_pdf_path])
+    if (s.signature_path) await supabase.storage.from('signatures').remove([s.signature_path])
+    await supabase.from('sign_assignments').delete().eq('id', s.id)
+    setSigns((prev) => prev.filter((x) => x.id !== s.id))
+  }
+
+  async function deleteFormSubmission(sub: FormSubmission) {
+    if (!confirm(`Delete "${sub.form_templates?.title ?? 'this form'}" submission?`)) return
+    await supabase.from('form_submissions').delete().eq('id', sub.id)
+    setSubmissions((prev) => prev.filter((x) => x.id !== sub.id))
+  }
+
   if (loading) return <p className="text-gray-500">Loading…</p>
   if (!worker) return <p className="text-gray-500">Worker not found.</p>
 
@@ -98,15 +112,24 @@ function WorkerDetail() {
                 </p>
               </div>
             </div>
-            {s.status === 'signed' && s.signed_pdf_path && (
+            <div className="flex items-center gap-2 shrink-0">
+              {s.status === 'signed' && s.signed_pdf_path && (
+                <button
+                  onClick={() => downloadSignedPdf(s.signed_pdf_path!, s.sign_requests?.title ?? 'document')}
+                  className="text-gray-400 hover:text-emerald-700 transition-colors"
+                  title="Download signed PDF"
+                >
+                  <Download size={16} />
+                </button>
+              )}
               <button
-                onClick={() => downloadSignedPdf(s.signed_pdf_path!, s.sign_requests?.title ?? 'document')}
-                className="shrink-0 text-gray-400 hover:text-emerald-700 transition-colors"
-                title="Download signed PDF"
+                onClick={() => deleteSignAssignment(s)}
+                className="text-gray-300 hover:text-red-500 transition-colors"
+                title="Delete from file"
               >
-                <Download size={16} />
+                <Trash2 size={15} />
               </button>
-            )}
+            </div>
           </div>
         ))}
       </div>
@@ -115,14 +138,23 @@ function WorkerDetail() {
       {submissions.length === 0 && <p className="text-sm text-gray-400">No submitted forms.</p>}
       <div className="space-y-2">
         {submissions.map((sub) => (
-          <div key={sub.id} className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 flex items-center gap-3">
-            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-            <div>
-              <p className="font-medium text-gray-800 text-sm">{sub.form_templates?.title ?? 'Form'}</p>
-              <p className="text-xs text-gray-400">
-                Submitted {new Date(sub.submitted_at).toLocaleDateString()}
-              </p>
+          <div key={sub.id} className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="font-medium text-gray-800 text-sm truncate">{sub.form_templates?.title ?? 'Form'}</p>
+                <p className="text-xs text-gray-400">
+                  Submitted {new Date(sub.submitted_at).toLocaleDateString()}
+                </p>
+              </div>
             </div>
+            <button
+              onClick={() => deleteFormSubmission(sub)}
+              className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+              title="Delete submission"
+            >
+              <Trash2 size={15} />
+            </button>
           </div>
         ))}
       </div>
