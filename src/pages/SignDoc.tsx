@@ -121,25 +121,29 @@ export default function SignDoc() {
 
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc || !canvasRef.current) return
-    // Double rAF: wait for browser to finish layout so offsetWidth is real
-    await new Promise<void>((r) => requestAnimationFrame(() => { requestAnimationFrame(() => r()) }))
-    if (!canvasRef.current) return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     if (renderTaskRef.current) renderTaskRef.current.cancel()
     try {
       const p = await pdfDoc.getPage(pageNum)
-      const containerWidth = canvas.parentElement?.offsetWidth || canvas.parentElement?.clientWidth || window.innerWidth
       const vp = p.getViewport({ scale: 1 })
-      const scale = containerWidth / vp.width
+      // Use window.innerWidth — always available, no layout dependency
+      const scale = window.innerWidth / vp.width
       const scaled = p.getViewport({ scale })
       canvas.width = scaled.width
       canvas.height = scaled.height
+      // CSS scales canvas to fit its container
+      canvas.style.width = '100%'
+      canvas.style.height = 'auto'
       setCanvasSize({ w: scaled.width, h: scaled.height })
       const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
       renderTaskRef.current = task
-      task.promise.catch(() => null)
+      task.promise.catch((e) => {
+        if (e?.name !== 'RenderingCancelledException') {
+          setError('PDF render failed. Try reopening.')
+        }
+      })
     } catch (e) {
       setError('Failed to render PDF page. Try closing and reopening the document.')
     }

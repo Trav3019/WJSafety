@@ -90,4 +90,5 @@ export interface NewsPost {
   image_path: string | null
   created_at: string
   profiles?: { full_name: string } | null
+  post_comments?: { id: string }[]
 }

@@ -22,7 +22,7 @@ function Avatar({ name, small }: { name: string; small?: boolean }) {
   )
 }
 
-function CommentSection({ postId, postedBy }: { postId: string; postedBy: string }) {
+function CommentSection({ postId, postedBy, initialCount }: { postId: string; postedBy: string; initialCount: number }) {
   const { profile, isAdmin } = useAuth()
   const [comments, setComments] = useState<PostComment[]>([])
   const [body, setBody] = useState('')
@@ -79,7 +79,11 @@ function CommentSection({ postId, postedBy }: { postId: string; postedBy: string
         className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-emerald-700 px-4 py-2.5 transition-colors w-full"
       >
         <MessageCircle size={14} />
-        {open ? 'Hide comments' : `Comments`}
+        {open
+          ? 'Hide comments'
+          : (open ? comments.length : initialCount) > 0
+            ? `${open ? comments.length : initialCount} comment${(open ? comments.length : initialCount) !== 1 ? 's' : ''}`
+            : 'Comments'}
       </button>
 
       {open && (
@@ -157,7 +161,7 @@ export default function Home() {
   async function loadPosts() {
     const { data } = await supabase
       .from('news_posts')
-      .select('*, profiles(full_name)')
+      .select('*, profiles(full_name), post_comments(id)')
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false })
     setPosts((data as unknown as NewsPost[]) ?? [])
@@ -383,7 +387,7 @@ export default function Home() {
               )}
 
               {/* Comments */}
-              <CommentSection postId={post.id} postedBy={post.posted_by ?? ''} />
+              <CommentSection postId={post.id} postedBy={post.posted_by ?? ''} initialCount={post.post_comments?.length ?? 0} />
             </article>
           )
         })}
