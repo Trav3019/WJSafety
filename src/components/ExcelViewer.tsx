@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { X, Download } from 'lucide-react'
 
@@ -8,11 +8,22 @@ interface Props {
   onClose: () => void
 }
 
+const MIN_SCALE = 0.2
+const MAX_SCALE = 3
+
 export default function ExcelViewer({ blob, title, onClose }: Props) {
   const [sheets, setSheets] = useState<string[]>([])
   const [activeSheet, setActiveSheet] = useState('')
   const [rows, setRows] = useState<string[][]>([])
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [scale, setScale] = useState(1)
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null)
+  const scaleRef = useRef(1)
+
+  // Keep ref in sync so touch handlers (closures) always see latest scale
+  useEffect(() => { scaleRef.current = scale }, [scale])
 
   useEffect(() => {
     blob.arrayBuffer().then((buf) => {
@@ -31,6 +42,49 @@ export default function ExcelViewer({ blob, title, onClose }: Props) {
     })
     setRows(data as string[][])
   }, [workbook, activeSheet])
+
+  // Attach non-passive touch listeners so we can preventDefault on pinch
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    function dist(touches: TouchList) {
+      const dx = touches[0].clientX - touches[1].clientX
+      const dy = touches[0].clientY - touches[1].clientY
+      return Math.hypot(dx, dy)
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        pinchRef.current = { startDist: dist(e.touches), startScale: scaleRef.current }
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length === 2 && pinchRef.current) {
+        e.preventDefault() // stop browser zoom / scroll during pinch
+        const newScale = Math.max(
+          MIN_SCALE,
+          Math.min(MAX_SCALE, pinchRef.current.startScale * (dist(e.touches) / pinchRef.current.startDist))
+        )
+        scaleRef.current = newScale
+        setScale(newScale)
+      }
+    }
+
+    function onTouchEnd() {
+      pinchRef.current = null
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [])
 
   function download() {
     const url = URL.createObjectURL(blob)
@@ -75,60 +129,59 @@ export default function ExcelViewer({ blob, title, onClose }: Props) {
         </div>
       )}
 
-      {/* Scroll in both directions — like every spreadsheet app on mobile */}
-      <div className="flex-1 overflow-auto bg-white">
+      <div ref={scrollRef} className="flex-1 overflow-auto bg-white">
         {rows.length === 0 ? (
           <p className="text-gray-400 text-sm p-6 text-center">Loading…</p>
         ) : (
-          <table style={{ borderCollapse: 'collapse', fontSize: 12, lineHeight: 1.4, whiteSpace: 'nowrap' }}>
-            <thead>
-              <tr>
-                {Array.from({ length: colCount }).map((_, ci) => (
-                  <th
-                    key={ci}
-                    style={{
-                      border: '1px solid #d1d5db',
-                      padding: '5px 10px',
-                      background: '#ecfdf5',
-                      color: '#065f46',
-                      fontWeight: 600,
-                      textAlign: 'left',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 1,
-                    }}
-                  >
-                    {rows[0]?.[ci] ?? ''}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(1).map((row, ri) => (
-                <tr key={ri} style={{ background: ri % 2 === 0 ? '#fff' : '#f9fafb' }}>
+          <div style={{ display: 'inline-block', transformOrigin: 'top left', transform: `scale(${scale})` }}>
+            <table style={{ borderCollapse: 'collapse', fontSize: 12, lineHeight: 1.4, whiteSpace: 'nowrap' }}>
+              <thead>
+                <tr>
                   {Array.from({ length: colCount }).map((_, ci) => (
-                    <td
+                    <th
                       key={ci}
                       style={{
-                        border: '1px solid #e5e7eb',
-                        padding: '4px 10px',
-                        color: '#1f2937',
+                        border: '1px solid #d1d5db',
+                        padding: '5px 10px',
+                        background: '#ecfdf5',
+                        color: '#065f46',
+                        fontWeight: 600,
+                        textAlign: 'left',
                       }}
                     >
-                      {row[ci] ?? ''}
-                    </td>
+                      {rows[0]?.[ci] ?? ''}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.slice(1).map((row, ri) => (
+                  <tr key={ri} style={{ background: ri % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                    {Array.from({ length: colCount }).map((_, ci) => (
+                      <td
+                        key={ci}
+                        style={{
+                          border: '1px solid #e5e7eb',
+                          padding: '4px 10px',
+                          color: '#1f2937',
+                        }}
+                      >
+                        {row[ci] ?? ''}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      <div className="shrink-0 bg-gray-50 border-t border-gray-200 px-4 py-1.5">
+      <div className="shrink-0 bg-gray-50 border-t border-gray-200 px-4 py-1.5 flex items-center justify-between">
         <span className="text-xs text-gray-400">
-          {rows.length > 0 ? rows.length - 1 : 0} rows · {colCount} cols · scroll to explore
+          {rows.length > 0 ? rows.length - 1 : 0} rows · {colCount} cols
         </span>
+        <span className="text-xs text-gray-400">{Math.round(scale * 100)}%</span>
       </div>
     </div>
   )
