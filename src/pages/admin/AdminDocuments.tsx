@@ -112,25 +112,22 @@ export default function AdminDocuments() {
           </select>
         </div>
 
-        {/* File drop zone */}
-        <div
-          className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer hover:border-emerald-400 transition-colors"
-          onClick={() => fileRef.current?.click()}
-        >
-          <Upload size={22} className="mx-auto text-gray-400 mb-1" />
-          <p className="text-sm text-gray-500">
+        {/* File drop zone — input is visible but covers the whole zone for iOS compatibility */}
+        <label className="block border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer hover:border-emerald-400 transition-colors relative">
+          <Upload size={22} className="mx-auto text-gray-400 mb-1 pointer-events-none" />
+          <p className="text-sm text-gray-500 pointer-events-none">
             {files.length > 0
-              ? `${files.length} file${files.length > 1 ? 's' : ''} selected`
+              ? `${files.length} file${files.length > 1 ? 's' : ''} selected — tap to change`
               : 'Tap to select files — you can pick multiple at once'}
           </p>
           <input
             ref={fileRef}
             type="file"
             multiple
-            className="hidden"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             onChange={pickFiles}
           />
-        </div>
+        </label>
 
         {/* File list with status */}
         {files.length > 0 && (

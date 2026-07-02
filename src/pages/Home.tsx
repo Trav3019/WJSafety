@@ -22,7 +22,7 @@ function Avatar({ name, small }: { name: string; small?: boolean }) {
   )
 }
 
-function CommentSection({ postId }: { postId: string }) {
+function CommentSection({ postId, postedBy }: { postId: string; postedBy: string }) {
   const { profile, isAdmin } = useAuth()
   const [comments, setComments] = useState<PostComment[]>([])
   const [body, setBody] = useState('')
@@ -51,6 +51,17 @@ function CommentSection({ postId }: { postId: string }) {
       commented_by: profile?.id,
       body: body.trim(),
     })
+    // Notify the post author if it's not the commenter themselves
+    if (postedBy && postedBy !== profile?.id) {
+      supabase.functions.invoke('send-push', {
+        body: {
+          type: 'comment_posted',
+          user_id: postedBy,
+          commenter_name: profile?.full_name ?? 'Someone',
+          post_id: postId,
+        },
+      })
+    }
     setBody('')
     setSending(false)
     loadComments()
@@ -372,7 +383,7 @@ export default function Home() {
               )}
 
               {/* Comments */}
-              <CommentSection postId={post.id} />
+              <CommentSection postId={post.id} postedBy={post.posted_by} />
             </article>
           )
         })}

@@ -42,6 +42,10 @@ Deno.serve(async (req) => {
     title = 'Document ready to sign'
     body = payload.title
     query = query.eq('user_id', payload.user_id)
+  } else if (payload.type === 'comment_posted') {
+    title = `${payload.commenter_name} commented on your post`
+    body = ''
+    query = query.eq('user_id', payload.user_id)
   } else {
     return new Response('Unknown event type', { status: 400 })
   }
