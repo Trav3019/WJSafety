@@ -1,23 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, FileText, Trash2 } from 'lucide-react'
+import { ArrowLeft, FileText, Trash2, Upload, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import type { Category, SafetyDocument } from '../../lib/types'
 
 export default function AdminDocuments() {
   const { profile } = useAuth()
+  const fileRef = useRef<HTMLInputElement>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryId, setCategoryId] = useState('')
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState<Record<string, 'pending' | 'done' | 'error'>>({})
   const [error, setError] = useState<string | null>(null)
   const [docs, setDocs] = useState<SafetyDocument[]>([])
 
   async function loadDocs() {
-    const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false }).limit(20)
+    const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false }).limit(30)
     setDocs(data ?? [])
   }
 
@@ -33,39 +33,51 @@ export default function AdminDocuments() {
     loadDocs()
   }, [])
 
+  function pickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    setFiles(Array.from(e.target.files ?? []))
+    setProgress({})
+    setError(null)
+  }
+
+  function removeFile(name: string) {
+    setFiles((f) => f.filter((x) => x.name !== name))
+    setProgress((p) => { const next = { ...p }; delete next[name]; return next })
+  }
+
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault()
-    if (!file || !categoryId) return
+    if (!files.length || !categoryId) return
     setUploading(true)
     setError(null)
 
-    const path = `${categoryId}/${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage.from('documents').upload(path, file)
-    if (uploadError) {
-      setError(uploadError.message)
-      setUploading(false)
-      return
-    }
+    const initial: Record<string, 'pending' | 'done' | 'error'> = {}
+    files.forEach((f) => (initial[f.name] = 'pending'))
+    setProgress(initial)
 
-    const { error: insertError } = await supabase.from('documents').insert({
-      category_id: categoryId,
-      title: title || file.name,
-      description: description || null,
-      storage_path: path,
-      file_type: file.type,
-      file_size_bytes: file.size,
-      uploaded_by: profile?.id,
-    })
+    await Promise.all(
+      files.map(async (file) => {
+        const path = `${categoryId}/${Date.now()}-${file.name}`
+        const { error: uploadError } = await supabase.storage.from('documents').upload(path, file)
+        if (uploadError) {
+          setProgress((p) => ({ ...p, [file.name]: 'error' }))
+          return
+        }
+        const { error: insertError } = await supabase.from('documents').insert({
+          category_id: categoryId,
+          title: file.name.replace(/\.[^.]+$/, ''), // strip extension for title
+          storage_path: path,
+          file_type: file.type,
+          file_size_bytes: file.size,
+          uploaded_by: profile?.id,
+        })
+        setProgress((p) => ({ ...p, [file.name]: insertError ? 'error' : 'done' }))
+      })
+    )
 
     setUploading(false)
-    if (insertError) {
-      setError(insertError.message)
-    } else {
-      setTitle('')
-      setDescription('')
-      setFile(null)
-      loadDocs()
-    }
+    setFiles([])
+    if (fileRef.current) fileRef.current.value = ''
+    loadDocs()
   }
 
   async function removeDoc(doc: SafetyDocument) {
@@ -74,6 +86,9 @@ export default function AdminDocuments() {
     await supabase.from('documents').delete().eq('id', doc.id)
     loadDocs()
   }
+
+  const allDone = files.length > 0 && files.every((f) => progress[f.name] === 'done')
+  const hasErrors = files.some((f) => progress[f.name] === 'error')
 
   return (
     <div>
@@ -92,45 +107,68 @@ export default function AdminDocuments() {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
           >
             {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+
+        {/* File drop zone */}
+        <div
+          className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer hover:border-emerald-400 transition-colors"
+          onClick={() => fileRef.current?.click()}
+        >
+          <Upload size={22} className="mx-auto text-gray-400 mb-1" />
+          <p className="text-sm text-gray-500">
+            {files.length > 0
+              ? `${files.length} file${files.length > 1 ? 's' : ''} selected`
+              : 'Tap to select files — you can pick multiple at once'}
+          </p>
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Defaults to file name"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">File</label>
-          <input
+            ref={fileRef}
             type="file"
-            required
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="w-full text-sm"
+            multiple
+            className="hidden"
+            onChange={pickFiles}
           />
         </div>
+
+        {/* File list with status */}
+        {files.length > 0 && (
+          <ul className="space-y-1.5">
+            {files.map((f) => {
+              const state = progress[f.name]
+              return (
+                <li key={f.name} className="flex items-center gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2">
+                  <FileText size={14} className="text-gray-400 shrink-0" />
+                  <span className="flex-1 truncate text-gray-700">{f.name}</span>
+                  {state === 'pending' && <span className="text-xs text-gray-400">Uploading…</span>}
+                  {state === 'done' && <span className="text-xs text-emerald-600 font-medium">Done</span>}
+                  {state === 'error' && <span className="text-xs text-red-500 font-medium">Failed</span>}
+                  {!state && (
+                    <button type="button" onClick={() => removeFile(f.name)} className="text-gray-400 hover:text-gray-600">
+                      <X size={14} />
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {allDone && !hasErrors && (
+          <p className="text-sm text-emerald-600 font-medium">All files uploaded successfully.</p>
+        )}
+        {hasErrors && (
+          <p className="text-sm text-red-500">Some files failed to upload. Check your connection and try again.</p>
+        )}
         {error && <p className="text-red-600 text-sm">{error}</p>}
+
         <button
           type="submit"
-          disabled={uploading}
+          disabled={uploading || !files.length}
           className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-lg py-2.5 font-medium shadow-sm transition-colors"
         >
-          {uploading ? 'Uploading…' : 'Upload'}
+          {uploading ? `Uploading ${files.length} file${files.length > 1 ? 's' : ''}…` : `Upload${files.length > 1 ? ` ${files.length} files` : ''}`}
         </button>
       </form>
 

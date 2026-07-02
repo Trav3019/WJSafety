@@ -38,6 +38,10 @@ Deno.serve(async (req) => {
     title = 'New form to sign'
     body = payload.title
     query = query.eq('user_id', payload.user_id)
+  } else if (payload.type === 'sign_assigned') {
+    title = 'Document ready to sign'
+    body = payload.title
+    query = query.eq('user_id', payload.user_id)
   } else {
     return new Response('Unknown event type', { status: 400 })
   }
