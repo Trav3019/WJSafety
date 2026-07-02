@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
 import PdfViewer from '../components/PdfViewer'
+import ExcelViewer from '../components/ExcelViewer'
 
 function formatSize(bytes: number | null) {
   if (!bytes) return ''
@@ -22,6 +23,7 @@ export default function DocumentCategory() {
   const [cachedMap, setCachedMap] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null)
+  const [excelViewer, setExcelViewer] = useState<{ blob: Blob; title: string } | null>(null)
 
   useEffect(() => {
     if (!categoryId) return
@@ -74,8 +76,14 @@ export default function DocumentCategory() {
         await cacheFile(doc.storage_path, blob)
         setCachedMap((m) => ({ ...m, [doc.id]: true }))
       }
-      const url = URL.createObjectURL(blob)
-      setViewer({ url, title: doc.title || 'Document' })
+      const ext = doc.storage_path.split('.').pop()?.toLowerCase() ?? ''
+      const isExcel = ['xlsx', 'xls', 'xlsm', 'xlsb', 'ods'].includes(ext)
+      if (isExcel) {
+        setExcelViewer({ blob, title: doc.title || 'Document' })
+      } else {
+        const url = URL.createObjectURL(blob)
+        setViewer({ url, title: doc.title || 'Document' })
+      }
     } finally {
       setBusy(null)
     }
@@ -105,6 +113,13 @@ export default function DocumentCategory() {
   return (
     <>
       {viewer && <PdfViewer url={viewer.url} title={viewer.title} onClose={closeViewer} />}
+      {excelViewer && (
+        <ExcelViewer
+          blob={excelViewer.blob}
+          title={excelViewer.title}
+          onClose={() => setExcelViewer(null)}
+        />
+      )}
       <div>
         <Link to="/documents" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
           <ArrowLeft size={15} />
