@@ -4,6 +4,17 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('pdfjs-dist')) return 'pdfjs'
+          if (id.includes('node_modules/xlsx')) return 'xlsx'
+          if (id.includes('node_modules/mammoth')) return 'mammoth'
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -13,6 +24,7 @@ export default defineConfig({
       filename: 'sw.ts',
       injectManifest: {
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
       },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
