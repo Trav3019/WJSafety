@@ -86,13 +86,18 @@ export default function SignDoc() {
         setValues(map)
       }
 
-      // Get signed URL for the PDF
-      const { data: urlData } = await supabase.storage.from('sign-pdfs').createSignedUrl(a.sign_requests.pdf_path, 3600)
-      if (!urlData?.signedUrl) { setLoading(false); return }
-      setPdfUrl(urlData.signedUrl)
+      // Download PDF as blob (avoids signed URL RLS issues)
+      const { data: pdfBlob, error: dlError } = await supabase.storage.from('sign-pdfs').download(a.sign_requests.pdf_path)
+      if (dlError || !pdfBlob) {
+        setError('Could not load PDF: ' + (dlError?.message ?? 'file not found'))
+        setLoading(false)
+        return
+      }
+      const objectUrl = URL.createObjectURL(pdfBlob)
+      setPdfUrl(objectUrl)
 
       // Load PDF.js doc
-      const doc = await pdfjsLib.getDocument({ url: urlData.signedUrl }).promise
+      const doc = await pdfjsLib.getDocument({ url: objectUrl }).promise
       setPdfDoc(doc)
       setTotalPages(doc.numPages)
 
@@ -113,7 +118,7 @@ export default function SignDoc() {
     const ctx = canvas.getContext('2d')!
     if (renderTaskRef.current) renderTaskRef.current.cancel()
     const p = await pdfDoc.getPage(pageNum)
-    const containerWidth = canvas.parentElement?.clientWidth ?? window.innerWidth
+    const containerWidth = canvas.parentElement?.offsetWidth || window.innerWidth
     const vp = p.getViewport({ scale: 1 })
     const scale = containerWidth / vp.width
     const scaled = p.getViewport({ scale })
@@ -126,6 +131,9 @@ export default function SignDoc() {
   }, [pdfDoc])
 
   useEffect(() => { renderPage(page) }, [pdfDoc, page, renderPage])
+
+  // Clean up object URL on unmount
+  useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl) }, [pdfUrl])
 
   const pageFields = fields.filter((f) => f.page === page)
 
@@ -214,6 +222,7 @@ export default function SignDoc() {
   }
 
   if (loading) return <p className="text-gray-500 p-4">Loading…</p>
+  if (error && !assignment) return <p className="text-red-500 p-4">{error}</p>
   if (!assignment) return <p className="text-gray-500 p-4">Document not found.</p>
 
   const title = assignment.sign_requests.title
