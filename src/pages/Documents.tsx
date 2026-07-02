@@ -15,15 +15,24 @@ const iconByCategory: Record<string, LucideIcon> = {
 
 export default function Documents() {
   const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!localStorage.getItem('wjs_categories'))
 
   useEffect(() => {
+    // Load cached categories immediately so the page works offline
+    const cached = localStorage.getItem('wjs_categories')
+    if (cached) {
+      try { setCategories(JSON.parse(cached)) } catch { /* ignore */ }
+    }
+
     supabase
       .from('categories')
       .select('*')
       .order('sort_order')
-      .then(({ data }) => {
-        setCategories(data ?? [])
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          setCategories(data)
+          localStorage.setItem('wjs_categories', JSON.stringify(data))
+        }
         setLoading(false)
       })
   }, [])

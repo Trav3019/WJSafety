@@ -18,26 +18,43 @@ export default function DocumentCategory() {
   const location = useLocation()
   const categoryName = (location.state as { name?: string } | null)?.name ?? 'Documents'
   const [docs, setDocs] = useState<SafetyDocument[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!localStorage.getItem(`wjs_docs_${categoryId ?? ''}`))
   const [cachedMap, setCachedMap] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null)
 
   useEffect(() => {
     if (!categoryId) return
+
+    // Load cached doc list immediately so the page works offline
+    const cacheKey = `wjs_docs_${categoryId}`
+    const cached = localStorage.getItem(cacheKey)
+    if (cached) {
+      try {
+        const list: SafetyDocument[] = JSON.parse(cached)
+        setDocs(list)
+        // Populate cached map from IndexedDB
+        Promise.all(list.map(async (doc) => [doc.id, await isCached(doc.storage_path)] as const))
+          .then((entries) => setCachedMap(Object.fromEntries(entries)))
+      } catch { /* ignore */ }
+    }
+
     supabase
       .from('documents')
       .select('*')
       .eq('category_id', categoryId)
       .order('created_at', { ascending: false })
-      .then(async ({ data }) => {
-        const list = data ?? []
-        setDocs(list)
+      .then(async ({ data, error }) => {
+        const list = (!error && data) ? data : []
+        if (list.length > 0) {
+          setDocs(list)
+          localStorage.setItem(cacheKey, JSON.stringify(list))
+        }
         const map: Record<string, boolean> = {}
         for (const doc of list) {
           map[doc.id] = await isCached(doc.storage_path)
         }
-        setCachedMap(map)
+        if (list.length > 0) setCachedMap(map)
         setLoading(false)
       })
   }, [categoryId])
