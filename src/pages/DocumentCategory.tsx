@@ -25,7 +25,7 @@ export default function DocumentCategory() {
   const [cachedMap, setCachedMap] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null)
-  const [excelViewer, setExcelViewer] = useState<{ blob: Blob; title: string } | null>(null)
+  const [excelViewer, setExcelViewer] = useState<{ blob: Blob; title: string; storagePath: string } | null>(null)
   const [wordViewer, setWordViewer] = useState<{ blob: Blob; title: string } | null>(null)
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function DocumentCategory() {
       const isExcel = ['xlsx', 'xls', 'xlsm', 'xlsb', 'ods'].includes(ext)
       const isWord = ['docx', 'doc'].includes(ext)
       if (isExcel) {
-        setExcelViewer({ blob, title: doc.title || 'Document' })
+        setExcelViewer({ blob, title: doc.title || 'Document', storagePath: doc.storage_path })
       } else if (isWord) {
         setWordViewer({ blob, title: doc.title || 'Document' })
       } else {
@@ -120,7 +120,7 @@ export default function DocumentCategory() {
     <>
       {viewer && <PdfViewer url={viewer.url} title={viewer.title} onClose={closeViewer} />}
       {excelViewer && (
-        <ExcelViewer blob={excelViewer.blob} title={excelViewer.title} onClose={() => setExcelViewer(null)} />
+        <ExcelViewer blob={excelViewer.blob} title={excelViewer.title} storagePath={excelViewer.storagePath} onClose={() => setExcelViewer(null)} />
       )}
       {wordViewer && (
         <WordViewer blob={wordViewer.blob} title={wordViewer.title} onClose={() => setWordViewer(null)} />
