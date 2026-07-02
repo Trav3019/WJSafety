@@ -97,7 +97,14 @@ export default function SignDoc() {
       setPdfUrl(objectUrl)
 
       // Load PDF.js doc
-      const doc = await pdfjsLib.getDocument({ url: objectUrl }).promise
+      let doc: pdfjsLib.PDFDocumentProxy
+      try {
+        doc = await pdfjsLib.getDocument({ url: objectUrl }).promise
+      } catch (e) {
+        setError('Failed to parse PDF: ' + (e instanceof Error ? e.message : String(e)))
+        setLoading(false)
+        return
+      }
       setPdfDoc(doc)
       setTotalPages(doc.numPages)
 
@@ -114,20 +121,28 @@ export default function SignDoc() {
 
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc || !canvasRef.current) return
+    // Double rAF: wait for browser to finish layout so offsetWidth is real
+    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    if (!canvasRef.current) return
     const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
     if (renderTaskRef.current) renderTaskRef.current.cancel()
-    const p = await pdfDoc.getPage(pageNum)
-    const containerWidth = canvas.parentElement?.offsetWidth || window.innerWidth
-    const vp = p.getViewport({ scale: 1 })
-    const scale = containerWidth / vp.width
-    const scaled = p.getViewport({ scale })
-    canvas.width = scaled.width
-    canvas.height = scaled.height
-    setCanvasSize({ w: scaled.width, h: scaled.height })
-    const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
-    renderTaskRef.current = task
-    task.promise.catch(() => null)
+    try {
+      const p = await pdfDoc.getPage(pageNum)
+      const containerWidth = canvas.parentElement?.offsetWidth || canvas.parentElement?.clientWidth || window.innerWidth
+      const vp = p.getViewport({ scale: 1 })
+      const scale = containerWidth / vp.width
+      const scaled = p.getViewport({ scale })
+      canvas.width = scaled.width
+      canvas.height = scaled.height
+      setCanvasSize({ w: scaled.width, h: scaled.height })
+      const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
+      renderTaskRef.current = task
+      task.promise.catch(() => null)
+    } catch (e) {
+      setError('Failed to render PDF page. Try closing and reopening the document.')
+    }
   }, [pdfDoc])
 
   useEffect(() => { renderPage(page) }, [pdfDoc, page, renderPage])
@@ -279,9 +294,14 @@ export default function SignDoc() {
 
             {/* PDF canvas + field overlays — canvas always mounted so ref is valid when PDF.js renders */}
             <div className="relative rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-              {loading && (
+              {loading && !error && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 bg-gray-100">
                   <p className="text-gray-400 text-sm">Loading document…</p>
+                </div>
+              )}
+              {error && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 bg-gray-100 p-4">
+                  <p className="text-red-500 text-sm text-center">{error}</p>
                 </div>
               )}
               <canvas ref={canvasRef} className="w-full block" />
