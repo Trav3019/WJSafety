@@ -29,22 +29,36 @@ export default function ExcelViewer({ blob, title, onClose }: Props) {
     // Let SheetJS generate a full HTML document for this sheet
     const htmlStr = XLSX.utils.sheet_to_html(workbook.Sheets[activeSheet])
 
-    // Wrap with viewport meta + basic mobile-friendly styles
+    // Wrap with styles + a script that auto-scales the table to fit screen width
     const full = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5"/>
+<meta id="vp" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5"/>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 8px; font-family: -apple-system, sans-serif; font-size: 13px; }
-  table { border-collapse: collapse; min-width: 100%; }
+  body { margin: 0; padding: 6px; font-family: -apple-system, sans-serif; font-size: 13px; }
+  table { border-collapse: collapse; }
   td, th { border: 1px solid #d1d5db; padding: 4px 8px; white-space: nowrap; vertical-align: top; }
   tr:first-child td, tr:first-child th { background: #ecfdf5; font-weight: 600; color: #065f46; position: sticky; top: 0; z-index: 1; }
   tr:nth-child(even) td { background: #f9fafb; }
 </style>
 </head>
-<body>${htmlStr}</body>
+<body>${htmlStr}
+<script>
+  window.addEventListener('load', function() {
+    var table = document.querySelector('table');
+    if (!table) return;
+    var tw = table.scrollWidth + 12;
+    var sw = window.screen.width;
+    if (tw > sw) {
+      var scale = (sw / tw).toFixed(4);
+      document.getElementById('vp').content =
+        'width=' + tw + ', initial-scale=' + scale + ', maximum-scale=5';
+    }
+  });
+<\/script>
+</body>
 </html>`
 
     const htmlBlob = new Blob([full], { type: 'text/html' })
