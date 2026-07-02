@@ -6,6 +6,7 @@ import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
 import PdfViewer from '../components/PdfViewer'
 import ExcelViewer from '../components/ExcelViewer'
+import WordViewer from '../components/WordViewer'
 
 function formatSize(bytes: number | null) {
   if (!bytes) return ''
@@ -24,6 +25,7 @@ export default function DocumentCategory() {
   const [busy, setBusy] = useState<string | null>(null)
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null)
   const [excelViewer, setExcelViewer] = useState<{ blob: Blob; title: string } | null>(null)
+  const [wordViewer, setWordViewer] = useState<{ blob: Blob; title: string } | null>(null)
 
   useEffect(() => {
     if (!categoryId) return
@@ -78,8 +80,11 @@ export default function DocumentCategory() {
       }
       const ext = doc.storage_path.split('.').pop()?.toLowerCase() ?? ''
       const isExcel = ['xlsx', 'xls', 'xlsm', 'xlsb', 'ods'].includes(ext)
+      const isWord = ['docx', 'doc'].includes(ext)
       if (isExcel) {
         setExcelViewer({ blob, title: doc.title || 'Document' })
+      } else if (isWord) {
+        setWordViewer({ blob, title: doc.title || 'Document' })
       } else {
         const url = URL.createObjectURL(blob)
         setViewer({ url, title: doc.title || 'Document' })
@@ -114,11 +119,10 @@ export default function DocumentCategory() {
     <>
       {viewer && <PdfViewer url={viewer.url} title={viewer.title} onClose={closeViewer} />}
       {excelViewer && (
-        <ExcelViewer
-          blob={excelViewer.blob}
-          title={excelViewer.title}
-          onClose={() => setExcelViewer(null)}
-        />
+        <ExcelViewer blob={excelViewer.blob} title={excelViewer.title} onClose={() => setExcelViewer(null)} />
+      )}
+      {wordViewer && (
+        <WordViewer blob={wordViewer.blob} title={wordViewer.title} onClose={() => setWordViewer(null)} />
       )}
       <div>
         <Link to="/documents" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
