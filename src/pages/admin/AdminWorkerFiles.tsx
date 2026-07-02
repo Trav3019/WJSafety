@@ -63,13 +63,15 @@ function WorkerDetail() {
     if (!confirm(`Delete "${s.sign_requests?.title}" from this worker's file?`)) return
     if (s.signed_pdf_path) await supabase.storage.from('signed-pdfs').remove([s.signed_pdf_path])
     if (s.signature_path) await supabase.storage.from('signatures').remove([s.signature_path])
-    await supabase.from('sign_assignments').delete().eq('id', s.id)
+    const { error } = await supabase.from('sign_assignments').delete().eq('id', s.id)
+    if (error) { alert('Delete failed: ' + error.message); return }
     setSigns((prev) => prev.filter((x) => x.id !== s.id))
   }
 
   async function deleteFormSubmission(sub: FormSubmission) {
     if (!confirm(`Delete "${sub.form_templates?.title ?? 'this form'}" submission?`)) return
-    await supabase.from('form_submissions').delete().eq('id', sub.id)
+    const { error } = await supabase.from('form_submissions').delete().eq('id', sub.id)
+    if (error) { alert('Delete failed: ' + error.message); return }
     setSubmissions((prev) => prev.filter((x) => x.id !== sub.id))
   }
 
