@@ -122,7 +122,7 @@ export default function SignDoc() {
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc || !canvasRef.current) return
     // Double rAF: wait for browser to finish layout so offsetWidth is real
-    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    await new Promise<void>((r) => requestAnimationFrame(() => { requestAnimationFrame(() => r()) }))
     if (!canvasRef.current) return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
