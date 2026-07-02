@@ -221,12 +221,11 @@ export default function SignDoc() {
     }
   }
 
-  if (loading) return <p className="text-gray-500 p-4">Loading…</p>
   if (error && !assignment) return <p className="text-red-500 p-4">{error}</p>
-  if (!assignment) return <p className="text-gray-500 p-4">Document not found.</p>
+  if (!loading && !assignment) return <p className="text-gray-500 p-4">Document not found.</p>
 
-  const title = assignment.sign_requests.title
-  const alreadySigned = assignment.status === 'signed'
+  const title = assignment?.sign_requests.title ?? ''
+  const alreadySigned = assignment?.status === 'signed'
   const completedCount = fields.filter((f) => !!values[f.id]).length
 
   return (
@@ -272,14 +271,19 @@ export default function SignDoc() {
           </div>
         ) : (
           <>
-            {fields.length > 0 && (
+            {fields.length > 0 && !loading && (
               <p className="text-sm text-gray-500 mb-3">
                 Tap the coloured boxes to sign. {completedCount}/{fields.length} fields completed.
               </p>
             )}
 
-            {/* PDF canvas + field overlays */}
+            {/* PDF canvas + field overlays — canvas always mounted so ref is valid when PDF.js renders */}
             <div className="relative rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 bg-gray-100">
+                  <p className="text-gray-400 text-sm">Loading document…</p>
+                </div>
+              )}
               <canvas ref={canvasRef} className="w-full block" />
 
               {/* Field overlays */}
@@ -339,11 +343,11 @@ export default function SignDoc() {
               </div>
             )}
 
-            {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+            {error && !loading && <p className="text-sm text-red-600 mt-3">{error}</p>}
 
             <button
               onClick={submit}
-              disabled={submitting || !allRequired}
+              disabled={submitting || !allRequired || loading}
               className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-xl py-3.5 font-medium shadow-sm transition-colors"
             >
               <Send size={16} />
