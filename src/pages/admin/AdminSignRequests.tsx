@@ -1,0 +1,221 @@
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowLeft, Upload, Users, CheckCircle2, Clock } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
+import type { Profile } from '../../lib/types'
+
+interface SignRequest {
+  id: string
+  title: string
+  pdf_path: string
+  created_at: string
+}
+
+interface SignAssignment {
+  id: string
+  request_id: string
+  status: string
+  signed_at: string | null
+  profiles?: { full_name: string } | null
+}
+
+export default function AdminSignRequests() {
+  const { profile } = useAuth()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [workers, setWorkers] = useState<Profile[]>([])
+  const [requests, setRequests] = useState<SignRequest[]>([])
+  const [assignments, setAssignments] = useState<SignAssignment[]>([])
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const [title, setTitle] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
+  const [sendToAll, setSendToAll] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  async function load() {
+    const [{ data: reqs }, { data: ws }, { data: asgns }] = await Promise.all([
+      supabase.from('sign_requests').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('*').eq('status', 'approved').neq('role', 'admin'),
+      supabase.from('sign_assignments').select('*, profiles(full_name)'),
+    ])
+    setRequests((reqs as unknown as SignRequest[]) ?? [])
+    setWorkers((ws as unknown as Profile[]) ?? [])
+    setAssignments((asgns as unknown as SignAssignment[]) ?? [])
+  }
+
+  useEffect(() => { load() }, [])
+
+  function toggleWorker(id: string) {
+    setSelectedWorkers((ws) => ws.includes(id) ? ws.filter((w) => w !== id) : [...ws, id])
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!file || !title.trim()) return
+    const targets = sendToAll ? workers.map((w) => w.id) : selectedWorkers
+    if (targets.length === 0) { setMessage('Select at least one worker.'); return }
+
+    setUploading(true)
+    setMessage(null)
+
+    const ext = file.name.split('.').pop()
+    const pdfPath = `${Date.now()}-${crypto.randomUUID()}.${ext}`
+    const { error: upErr } = await supabase.storage.from('sign-pdfs').upload(pdfPath, file)
+    if (upErr) { setMessage('Upload failed: ' + upErr.message); setUploading(false); return }
+
+    const { data: req, error: reqErr } = await supabase
+      .from('sign_requests')
+      .insert({ title: title.trim(), pdf_path: pdfPath, created_by: profile?.id })
+      .select()
+      .single()
+    if (reqErr || !req) { setMessage('Failed to create sign request.'); setUploading(false); return }
+
+    const rows = targets.map((workerId) => ({
+      request_id: req.id,
+      assigned_to: workerId,
+      assigned_by: profile?.id,
+    }))
+    await supabase.from('sign_assignments').insert(rows)
+
+    setTitle('')
+    setFile(null)
+    setSelectedWorkers([])
+    setSendToAll(false)
+    if (fileRef.current) fileRef.current.value = ''
+    setMessage(`Sent to ${targets.length} worker(s).`)
+    setUploading(false)
+    load()
+  }
+
+  function assignmentsFor(requestId: string) {
+    return assignments.filter((a) => a.request_id === requestId)
+  }
+
+  return (
+    <div>
+      <Link to="/admin" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
+        <ArrowLeft size={15} />
+        Admin
+      </Link>
+      <h1 className="text-xl font-bold text-gray-900 mb-4">PDF Sign Requests</h1>
+
+      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">Upload & send a PDF to sign</h2>
+      <form onSubmit={handleSubmit} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3 mb-6">
+        <input
+          required
+          placeholder="Document title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
+        />
+
+        <div
+          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-emerald-400 transition-colors"
+          onClick={() => fileRef.current?.click()}
+        >
+          <Upload size={22} className="mx-auto text-gray-400 mb-1" />
+          {file ? (
+            <p className="text-sm font-medium text-emerald-700">{file.name}</p>
+          ) : (
+            <p className="text-sm text-gray-500">Tap to select a PDF</p>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-medium text-gray-700">Send to</p>
+            <label className="flex items-center gap-1.5 text-sm text-gray-600">
+              <input type="checkbox" checked={sendToAll} onChange={(e) => setSendToAll(e.target.checked)} />
+              All workers
+            </label>
+          </div>
+          {!sendToAll && (
+            <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2.5 bg-gray-50">
+              {workers.map((w) => (
+                <label key={w.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedWorkers.includes(w.id)}
+                    onChange={() => toggleWorker(w.id)}
+                  />
+                  {w.full_name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {message && <p className="text-sm text-emerald-700">{message}</p>}
+
+        <button
+          type="submit"
+          disabled={uploading || !file || !title.trim()}
+          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-lg py-2.5 font-medium shadow-sm transition-colors"
+        >
+          {uploading ? 'Uploading…' : 'Send for signature'}
+        </button>
+      </form>
+
+      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">Sent requests</h2>
+      {requests.length === 0 && (
+        <p className="text-sm text-gray-400">No sign requests yet.</p>
+      )}
+      <div className="space-y-2">
+        {requests.map((req) => {
+          const asgns = assignmentsFor(req.id)
+          const signed = asgns.filter((a) => a.status === 'signed').length
+          const isOpen = expanded === req.id
+          return (
+            <div key={req.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 text-left"
+                onClick={() => setExpanded(isOpen ? null : req.id)}
+              >
+                <div>
+                  <p className="font-medium text-gray-800 text-sm">{req.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full shrink-0">
+                  <Users size={12} />
+                  {signed}/{asgns.length} signed
+                </div>
+              </button>
+              {isOpen && (
+                <div className="border-t border-gray-100 px-4 py-3 space-y-1.5">
+                  {asgns.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700">{a.profiles?.full_name ?? '—'}</span>
+                      {a.status === 'signed' ? (
+                        <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                          <CheckCircle2 size={13} />
+                          Signed {a.signed_at ? new Date(a.signed_at).toLocaleDateString() : ''}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-amber-500 text-xs font-medium">
+                          <Clock size={13} />
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

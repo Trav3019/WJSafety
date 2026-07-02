@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
-import { Users, UploadCloud, ClipboardList, Megaphone, ChevronRight, type LucideIcon } from 'lucide-react'
+import { Users, UploadCloud, ClipboardList, Megaphone, ChevronRight, FileSignature, FolderOpen, type LucideIcon } from 'lucide-react'
 
 const links: { to: string; label: string; desc: string; icon: LucideIcon }[] = [
   { to: '/admin/users', label: 'Manage Users', desc: 'Approve new accounts and set roles', icon: Users },
   { to: '/admin/documents', label: 'Upload Documents', desc: 'Add SDS, plans, inventories and more', icon: UploadCloud },
   { to: '/admin/forms', label: 'Forms', desc: 'Create forms and send them out for signature', icon: ClipboardList },
+  { to: '/admin/sign-requests', label: 'PDF Sign Requests', desc: 'Upload a PDF and send it to workers to sign', icon: FileSignature },
+  { to: '/admin/worker-files', label: 'Worker Files', desc: 'View completed documents per employee', icon: FolderOpen },
   { to: '/admin/news', label: 'Post Safety Update', desc: 'Share news on the home feed', icon: Megaphone },
 ]
 
