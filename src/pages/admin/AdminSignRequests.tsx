@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Upload, Users, CheckCircle2, Clock } from 'lucide-react'
+import { ArrowLeft, Upload, Users, CheckCircle2, Clock, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import type { Profile } from '../../lib/types'
+import PdfFieldEditor, { type PlacedField } from '../../components/PdfFieldEditor'
 
 interface SignRequest {
   id: string
@@ -20,6 +21,8 @@ interface SignAssignment {
   profiles?: { full_name: string } | null
 }
 
+type Step = 'details' | 'fields'
+
 export default function AdminSignRequests() {
   const { profile } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -28,10 +31,16 @@ export default function AdminSignRequests() {
   const [assignments, setAssignments] = useState<SignAssignment[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
 
+  // Step 1 state
+  const [step, setStep] = useState<Step>('details')
   const [title, setTitle] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([])
   const [sendToAll, setSendToAll] = useState(false)
+
+  // Step 2 state
+  const [fields, setFields] = useState<PlacedField[]>([])
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -48,22 +57,36 @@ export default function AdminSignRequests() {
 
   useEffect(() => { load() }, [])
 
+  function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null
+    setFile(f)
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
+    setFilePreviewUrl(f ? URL.createObjectURL(f) : null)
+  }
+
   function toggleWorker(id: string) {
     setSelectedWorkers((ws) => ws.includes(id) ? ws.filter((w) => w !== id) : [...ws, id])
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function goToFields(e: React.FormEvent) {
     e.preventDefault()
-    if (!file || !title.trim()) return
     const targets = sendToAll ? workers.map((w) => w.id) : selectedWorkers
-    if (targets.length === 0) { setMessage('Select at least one worker.'); return }
+    if (!file || !title.trim() || targets.length === 0) {
+      setMessage('Please fill in all fields and select at least one worker.')
+      return
+    }
+    setMessage(null)
+    setStep('fields')
+  }
 
+  async function handleSend() {
+    const targets = sendToAll ? workers.map((w) => w.id) : selectedWorkers
     setUploading(true)
     setMessage(null)
 
-    const ext = file.name.split('.').pop()
+    const ext = file!.name.split('.').pop()
     const pdfPath = `${Date.now()}-${crypto.randomUUID()}.${ext}`
-    const { error: upErr } = await supabase.storage.from('sign-pdfs').upload(pdfPath, file)
+    const { error: upErr } = await supabase.storage.from('sign-pdfs').upload(pdfPath, file!)
     if (upErr) { setMessage('Upload failed: ' + upErr.message); setUploading(false); return }
 
     const { data: req, error: reqErr } = await supabase
@@ -73,6 +96,24 @@ export default function AdminSignRequests() {
       .single()
     if (reqErr || !req) { setMessage('Failed to create sign request.'); setUploading(false); return }
 
+    // Save field positions
+    if (fields.length > 0) {
+      await supabase.from('sign_fields').insert(
+        fields.map((f, i) => ({
+          request_id: req.id,
+          page: f.page,
+          x: f.x,
+          y: f.y,
+          width: f.width,
+          height: f.height,
+          type: f.type,
+          label: f.label,
+          sort_order: i,
+        }))
+      )
+    }
+
+    // Create assignments
     const rows = targets.map((workerId) => ({
       request_id: req.id,
       assigned_to: workerId,
@@ -80,10 +121,15 @@ export default function AdminSignRequests() {
     }))
     await supabase.from('sign_assignments').insert(rows)
 
+    // Reset
     setTitle('')
     setFile(null)
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
+    setFilePreviewUrl(null)
     setSelectedWorkers([])
     setSendToAll(false)
+    setFields([])
+    setStep('details')
     if (fileRef.current) fileRef.current.value = ''
     setMessage(`Sent to ${targets.length} worker(s).`)
     setUploading(false)
@@ -102,74 +148,121 @@ export default function AdminSignRequests() {
       </Link>
       <h1 className="text-xl font-bold text-gray-900 mb-4">PDF Sign Requests</h1>
 
-      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">Upload & send a PDF to sign</h2>
-      <form onSubmit={handleSubmit} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3 mb-6">
-        <input
-          required
-          placeholder="Document title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
-        />
+      {/* Step indicator */}
+      <div className="flex items-center gap-2 mb-4 text-xs font-medium">
+        <span className={step === 'details' ? 'text-emerald-700' : 'text-gray-400'}>
+          1. Details & Workers
+        </span>
+        <ChevronRight size={14} className="text-gray-300" />
+        <span className={step === 'fields' ? 'text-emerald-700' : 'text-gray-400'}>
+          2. Place Signature Fields
+        </span>
+      </div>
 
-        <div
-          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-emerald-400 transition-colors"
-          onClick={() => fileRef.current?.click()}
-        >
-          <Upload size={22} className="mx-auto text-gray-400 mb-1" />
-          {file ? (
-            <p className="text-sm font-medium text-emerald-700">{file.name}</p>
-          ) : (
-            <p className="text-sm text-gray-500">Tap to select a PDF</p>
-          )}
+      {step === 'details' && (
+        <form onSubmit={goToFields} className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3 mb-6">
           <input
-            ref={fileRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            required
+            placeholder="Document title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
           />
-        </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-sm font-medium text-gray-700">Send to</p>
-            <label className="flex items-center gap-1.5 text-sm text-gray-600">
-              <input type="checkbox" checked={sendToAll} onChange={(e) => setSendToAll(e.target.checked)} />
-              All workers
-            </label>
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-emerald-400 transition-colors"
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload size={22} className="mx-auto text-gray-400 mb-1" />
+            {file ? (
+              <p className="text-sm font-medium text-emerald-700">{file.name}</p>
+            ) : (
+              <p className="text-sm text-gray-500">Tap to select a PDF</p>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={pickFile}
+            />
           </div>
-          {!sendToAll && (
-            <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2.5 bg-gray-50">
-              {workers.map((w) => (
-                <label key={w.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedWorkers.includes(w.id)}
-                    onChange={() => toggleWorker(w.id)}
-                  />
-                  {w.full_name}
-                </label>
-              ))}
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-medium text-gray-700">Send to</p>
+              <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                <input type="checkbox" checked={sendToAll} onChange={(e) => setSendToAll(e.target.checked)} />
+                All workers
+              </label>
             </div>
-          )}
-        </div>
+            {!sendToAll && (
+              <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-2.5 bg-gray-50">
+                {workers.map((w) => (
+                  <label key={w.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selectedWorkers.includes(w.id)}
+                      onChange={() => toggleWorker(w.id)}
+                    />
+                    {w.full_name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {message && <p className="text-sm text-emerald-700">{message}</p>}
+          {message && <p className="text-sm text-red-600">{message}</p>}
 
-        <button
-          type="submit"
-          disabled={uploading || !file || !title.trim()}
-          className="w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-lg py-2.5 font-medium shadow-sm transition-colors"
-        >
-          {uploading ? 'Uploading…' : 'Send for signature'}
-        </button>
-      </form>
-
-      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">Sent requests</h2>
-      {requests.length === 0 && (
-        <p className="text-sm text-gray-400">No sign requests yet.</p>
+          <button
+            type="submit"
+            disabled={!file || !title.trim()}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-lg py-2.5 font-medium shadow-sm transition-colors"
+          >
+            Next: Place Fields
+            <ChevronRight size={16} />
+          </button>
+        </form>
       )}
+
+      {step === 'fields' && filePreviewUrl && (
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-4 mb-6">
+          <p className="text-sm text-gray-600">
+            Tap the PDF below to place signature, initials, or date fields. Workers will fill these in when they sign.
+          </p>
+
+          <PdfFieldEditor
+            pdfUrl={filePreviewUrl}
+            fields={fields}
+            onChange={setFields}
+          />
+
+          {message && <p className="text-sm text-red-600">{message}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setStep('details')}
+              className="flex-1 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={uploading}
+              className="flex-1 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-lg py-2.5 font-medium shadow-sm transition-colors text-sm"
+            >
+              {uploading ? 'Sending…' : `Send${fields.length > 0 ? ` (${fields.length} fields)` : ''}`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sent requests list */}
+      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">Sent requests</h2>
+      {message && step === 'details' && <p className="text-sm text-emerald-700 mb-2">{message}</p>}
+      {requests.length === 0 && <p className="text-sm text-gray-400">No sign requests yet.</p>}
       <div className="space-y-2">
         {requests.map((req) => {
           const asgns = assignmentsFor(req.id)

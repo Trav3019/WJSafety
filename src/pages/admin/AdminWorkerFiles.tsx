@@ -9,6 +9,7 @@ interface SignAssignment {
   status: string
   signed_at: string | null
   signature_path: string | null
+  signed_pdf_path: string | null
   sign_requests: { title: string; pdf_path: string }
 }
 
@@ -47,12 +48,12 @@ function WorkerDetail() {
     })
   }, [workerId])
 
-  async function downloadSignature(sigPath: string, workerName: string) {
-    const { data } = await supabase.storage.from('signatures').createSignedUrl(sigPath, 60)
+  async function downloadSignedPdf(signedPdfPath: string, docTitle: string) {
+    const { data } = await supabase.storage.from('signed-pdfs').createSignedUrl(signedPdfPath, 60)
     if (!data?.signedUrl) return
     const a = document.createElement('a')
     a.href = data.signedUrl
-    a.download = `${workerName}-signature.png`
+    a.download = `${docTitle} - signed.pdf`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -97,11 +98,11 @@ function WorkerDetail() {
                 </p>
               </div>
             </div>
-            {s.status === 'signed' && s.signature_path && (
+            {s.status === 'signed' && s.signed_pdf_path && (
               <button
-                onClick={() => downloadSignature(s.signature_path!, worker.full_name)}
+                onClick={() => downloadSignedPdf(s.signed_pdf_path!, s.sign_requests?.title ?? 'document')}
                 className="shrink-0 text-gray-400 hover:text-emerald-700 transition-colors"
-                title="Download signature"
+                title="Download signed PDF"
               >
                 <Download size={16} />
               </button>
