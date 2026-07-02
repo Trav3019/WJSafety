@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
-import { X, Download, ZoomIn, ZoomOut } from 'lucide-react'
+import { X, Download } from 'lucide-react'
 
 interface Props {
   blob: Blob
@@ -11,13 +11,12 @@ interface Props {
 export default function ExcelViewer({ blob, title, onClose }: Props) {
   const [sheets, setSheets] = useState<string[]>([])
   const [activeSheet, setActiveSheet] = useState('')
-  const [rows, setRows] = useState<string[][]>([])
+  const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
-  const [zoom, setZoom] = useState(1)
 
   useEffect(() => {
     blob.arrayBuffer().then((buf) => {
-      const wb = XLSX.read(buf, { type: 'array' })
+      const wb = XLSX.read(buf, { type: 'array', cellStyles: true })
       setWorkbook(wb)
       setSheets(wb.SheetNames)
       setActiveSheet(wb.SheetNames[0])
@@ -26,10 +25,35 @@ export default function ExcelViewer({ blob, title, onClose }: Props) {
 
   useEffect(() => {
     if (!workbook || !activeSheet) return
-    const ws = workbook.Sheets[activeSheet]
-    const data: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
-    setRows(data)
+
+    // Let SheetJS generate a full HTML document for this sheet
+    const htmlStr = XLSX.utils.sheet_to_html(workbook.Sheets[activeSheet])
+
+    // Wrap with viewport meta + basic mobile-friendly styles
+    const full = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5"/>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 8px; font-family: -apple-system, sans-serif; font-size: 13px; }
+  table { border-collapse: collapse; min-width: 100%; }
+  td, th { border: 1px solid #d1d5db; padding: 4px 8px; white-space: nowrap; vertical-align: top; }
+  tr:first-child td, tr:first-child th { background: #ecfdf5; font-weight: 600; color: #065f46; position: sticky; top: 0; z-index: 1; }
+  tr:nth-child(even) td { background: #f9fafb; }
+</style>
+</head>
+<body>${htmlStr}</body>
+</html>`
+
+    const htmlBlob = new Blob([full], { type: 'text/html' })
+    const url = URL.createObjectURL(htmlBlob)
+    setIframeSrc((prev) => { if (prev) URL.revokeObjectURL(prev); return url })
   }, [workbook, activeSheet])
+
+  // Clean up on unmount
+  useEffect(() => () => { if (iframeSrc) URL.revokeObjectURL(iframeSrc) }, [])
 
   function download() {
     const url = URL.createObjectURL(blob)
@@ -42,42 +66,22 @@ export default function ExcelViewer({ blob, title, onClose }: Props) {
     setTimeout(() => URL.revokeObjectURL(url), 5000)
   }
 
-  const headerRow = rows[0] ?? []
-  const dataRows = rows.slice(1)
-
   return (
     <div className="fixed inset-0 z-50 bg-gray-900 flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between bg-emerald-800 text-white px-4 py-3 shrink-0">
-        <span className="text-sm font-medium truncate flex-1 mr-2">{title}</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.15).toFixed(2)))}
-            className="text-white/80 hover:text-white p-1"
-            aria-label="Zoom out"
-          >
-            <ZoomOut size={17} />
+        <span className="text-sm font-medium truncate flex-1 mr-3">{title}</span>
+        <div className="flex items-center gap-3">
+          <button onClick={download} className="text-white/80 hover:text-white" aria-label="Download">
+            <Download size={18} />
           </button>
-          <span className="text-xs text-white/70 w-8 text-center">{Math.round(zoom * 100)}%</span>
-          <button
-            onClick={() => setZoom((z) => Math.min(2, +(z + 0.15).toFixed(2)))}
-            className="text-white/80 hover:text-white p-1"
-            aria-label="Zoom in"
-          >
-            <ZoomIn size={17} />
-          </button>
-          <button onClick={download} className="text-white/80 hover:text-white p-1" aria-label="Download">
-            <Download size={17} />
-          </button>
-          <button onClick={onClose} className="text-white/80 hover:text-white p-1" aria-label="Close">
-            <X size={19} />
+          <button onClick={onClose} className="text-white/80 hover:text-white" aria-label="Close">
+            <X size={20} />
           </button>
         </div>
       </div>
 
-      {/* Sheet tabs */}
       {sheets.length > 1 && (
-        <div className="flex overflow-x-auto bg-emerald-900 shrink-0 border-b border-emerald-700">
+        <div className="flex overflow-x-auto bg-emerald-900 shrink-0">
           {sheets.map((s) => (
             <button
               key={s}
@@ -92,56 +96,17 @@ export default function ExcelViewer({ blob, title, onClose }: Props) {
         </div>
       )}
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto bg-white">
-        {rows.length === 0 ? (
-          <p className="text-gray-400 text-sm p-6 text-center">Loading…</p>
+      <div className="flex-1 overflow-hidden">
+        {iframeSrc ? (
+          <iframe
+            key={iframeSrc}
+            src={iframeSrc}
+            className="w-full h-full border-0 bg-white"
+            title={activeSheet}
+          />
         ) : (
-          <div style={{ fontSize: `${zoom * 11}px`, minWidth: 'max-content' }}>
-            <table className="border-collapse">
-              <thead>
-                <tr className="sticky top-0 z-10 bg-emerald-700 text-white">
-                  {headerRow.map((cell, ci) => (
-                    <th
-                      key={ci}
-                      className={`border border-emerald-600 px-2 py-1.5 font-semibold text-left whitespace-nowrap ${
-                        ci === 0 ? 'sticky left-0 bg-emerald-700 z-20' : ''
-                      }`}
-                      style={{ maxWidth: `${zoom * 160}px`, overflow: 'hidden', textOverflow: 'ellipsis' }}
-                    >
-                      {String(cell ?? '')}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {dataRows.map((row, ri) => (
-                  <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    {headerRow.map((_, ci) => (
-                      <td
-                        key={ci}
-                        className={`border border-gray-200 px-2 py-1 whitespace-nowrap text-gray-800 ${
-                          ci === 0
-                            ? `sticky left-0 z-10 font-medium ${ri % 2 === 0 ? 'bg-emerald-50' : 'bg-emerald-50'}`
-                            : ''
-                        }`}
-                        style={{ maxWidth: `${zoom * 160}px`, overflow: 'hidden', textOverflow: 'ellipsis' }}
-                      >
-                        {String(row[ci] ?? '')}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className="text-gray-400 text-sm p-6 text-center bg-white h-full">Loading…</p>
         )}
-      </div>
-
-      {/* Footer hint */}
-      <div className="shrink-0 bg-gray-100 border-t border-gray-200 px-4 py-1.5 flex items-center justify-between">
-        <span className="text-xs text-gray-400">{dataRows.length} rows · {headerRow.length} columns</span>
-        <span className="text-xs text-gray-400">Scroll to navigate · Use +/− to zoom</span>
       </div>
     </div>
   )
