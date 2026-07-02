@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { PDFDocument, rgb } from 'pdf-lib'
 import { ChevronLeft, ChevronRight, Send, RotateCcw, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import SignatureCanvas, { type SignatureCanvasHandle } from '../components/SignatureCanvas'
 
-// Run PDF.js in main thread — avoids worker loading issues on mobile PWAs
-pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 interface SignField {
   id: string
