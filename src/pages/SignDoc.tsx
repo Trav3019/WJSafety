@@ -7,10 +7,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import SignatureCanvas, { type SignatureCanvasHandle } from '../components/SignatureCanvas'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+// Run PDF.js in main thread — avoids worker loading issues on mobile PWAs
+pdfjsLib.GlobalWorkerOptions.workerSrc = ''
 
 interface SignField {
   id: string
@@ -99,7 +97,7 @@ export default function SignDoc() {
       // Load PDF.js doc
       let doc: pdfjsLib.PDFDocumentProxy
       try {
-        doc = await pdfjsLib.getDocument({ url: objectUrl }).promise
+        doc = await pdfjsLib.getDocument({ data: await pdfBlob.arrayBuffer() }).promise
       } catch (e) {
         setError('Failed to parse PDF: ' + (e instanceof Error ? e.message : String(e)))
         setLoading(false)
@@ -141,11 +139,11 @@ export default function SignDoc() {
       renderTaskRef.current = task
       task.promise.catch((e) => {
         if (e?.name !== 'RenderingCancelledException') {
-          setError('PDF render failed. Try reopening.')
+          setError('Render error: ' + String(e))
         }
       })
     } catch (e) {
-      setError('Failed to render PDF page. Try closing and reopening the document.')
+      setError('Page error: ' + (e instanceof Error ? e.message : String(e)))
     }
   }, [pdfDoc])
 
