@@ -327,13 +327,6 @@ export default function AdminIncidents() {
 
       {loading && <p className="text-gray-500 text-sm">Loading…</p>}
 
-      {loadError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-          <p className="font-semibold mb-1">Error loading reports:</p>
-          <p className="font-mono text-xs">{loadError}</p>
-        </div>
-      )}
-
       {!loading && !loadError && workers.length === 0 && (
         <div className="text-center text-gray-400 text-sm bg-white border border-gray-100 rounded-xl p-8">
           No incident reports submitted yet.
