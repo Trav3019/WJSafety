@@ -75,15 +75,17 @@ export default function PdfFieldEditor({ pdfUrl, fields, onChange }: Props) {
     if (renderTaskRef.current) renderTaskRef.current.cancel()
 
     pdf.getPage(page).then((p) => {
-      const containerWidth = canvas.parentElement?.clientWidth ?? 600
+      const dpr = window.devicePixelRatio || 1
+      const containerWidth = canvas.parentElement?.clientWidth || 600
       const vp = p.getViewport({ scale: 1 })
-      const scale = (containerWidth / vp.width) * 2
+      const scale = (containerWidth / vp.width) * dpr
       const scaled = p.getViewport({ scale })
+      const displayH = scaled.height / dpr
       canvas.width = scaled.width
       canvas.height = scaled.height
       canvas.style.width = `${containerWidth}px`
-      canvas.style.height = `${scaled.height / 2}px`
-      setCanvasSize({ w: containerWidth, h: scaled.height / 2 })
+      canvas.style.height = `${displayH}px`
+      setCanvasSize({ w: containerWidth, h: displayH })
       const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
       renderTaskRef.current = task
       task.promise.catch(() => null)
@@ -139,7 +141,7 @@ export default function PdfFieldEditor({ pdfUrl, fields, onChange }: Props) {
 
       {/* PDF + overlay */}
       <div className="relative border border-gray-200 rounded-xl overflow-hidden bg-gray-100 select-none">
-        <canvas ref={canvasRef} className="w-full block" />
+        <canvas ref={canvasRef} className="block" />
 
         {/* Clickable overlay */}
         <div

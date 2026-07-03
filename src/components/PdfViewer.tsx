@@ -37,12 +37,15 @@ export default function PdfViewer({ url, title, onClose }: Props) {
     }
 
     pdf.getPage(page).then((p) => {
-      const containerWidth = canvas.parentElement?.clientWidth ?? window.innerWidth
+      const dpr = window.devicePixelRatio || 1
+      const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth
       const viewport = p.getViewport({ scale: 1 })
-      const scale = containerWidth / viewport.width
+      const scale = (containerWidth / viewport.width) * dpr
       const scaled = p.getViewport({ scale })
       canvas.width = scaled.width
       canvas.height = scaled.height
+      canvas.style.width = `${containerWidth}px`
+      canvas.style.height = `${scaled.height / dpr}px`
       const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
       renderTaskRef.current = task
       task.promise.catch(() => null)
@@ -76,7 +79,7 @@ export default function PdfViewer({ url, title, onClose }: Props) {
         {error && (
           <p className="text-white/60 text-sm mt-8">Could not render this document.</p>
         )}
-        <canvas ref={canvasRef} className="w-full max-w-full shadow-xl" />
+        <canvas ref={canvasRef} className="shadow-xl block" />
       </div>
 
       {totalPages > 1 && (

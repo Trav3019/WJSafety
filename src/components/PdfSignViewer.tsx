@@ -58,15 +58,17 @@ export default function PdfSignViewer({ blobUrl, fields, values, onFieldTap }: P
     if (renderTaskRef.current) renderTaskRef.current.cancel()
 
     pdf.getPage(page).then((p) => {
-      const containerWidth = canvas.parentElement?.clientWidth ?? window.innerWidth
+      const dpr = window.devicePixelRatio || 1
+      const containerWidth = canvas.parentElement?.clientWidth || window.innerWidth
       const vp = p.getViewport({ scale: 1 })
-      const scale = (containerWidth / vp.width) * 2
+      const scale = (containerWidth / vp.width) * dpr
       const scaled = p.getViewport({ scale })
+      const displayH = scaled.height / dpr
       canvas.width = scaled.width
       canvas.height = scaled.height
       canvas.style.width = `${containerWidth}px`
-      canvas.style.height = `${scaled.height / 2}px`
-      setCanvasSize({ w: containerWidth, h: scaled.height / 2 })
+      canvas.style.height = `${displayH}px`
+      setCanvasSize({ w: containerWidth, h: displayH })
       const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
       renderTaskRef.current = task
       task.promise.catch(() => null)
@@ -80,7 +82,7 @@ export default function PdfSignViewer({ blobUrl, fields, values, onFieldTap }: P
   return (
     <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm mb-4">
       <div className="relative bg-gray-100 select-none">
-        <canvas ref={canvasRef} className="w-full block" />
+        <canvas ref={canvasRef} className="block" />
 
         {/* Field overlays */}
         <div
