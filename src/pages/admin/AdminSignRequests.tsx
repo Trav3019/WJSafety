@@ -123,7 +123,7 @@ export default function AdminSignRequests() {
     // Notify each assigned worker
     await Promise.allSettled(
       targets.map((workerId) =>
-        supabase.functions.invoke('send-push', {
+        supabase.functions.invoke('Send-Push', {
           body: { type: 'sign_assigned', user_id: workerId, title: title.trim() },
         })
       )

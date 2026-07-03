@@ -53,7 +53,7 @@ function CommentSection({ postId, postedBy, initialCount }: { postId: string; po
     })
     // Notify the post author if it's not the commenter themselves
     if (postedBy && postedBy !== profile?.id) {
-      supabase.functions.invoke('send-push', {
+      supabase.functions.invoke('Send-Push', {
         body: {
           type: 'comment_posted',
           user_id: postedBy,

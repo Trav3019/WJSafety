@@ -149,7 +149,7 @@ export default function SignDoc() {
       }).eq('id', assignment.id)
 
       // Notify admins that the document was signed
-      await supabase.functions.invoke('send-push', {
+      await supabase.functions.invoke('Send-Push', {
         body: {
           type: 'doc_signed',
           worker_name: profile.full_name,
