@@ -75,16 +75,15 @@ export default function PdfFieldEditor({ pdfUrl, fields, onChange }: Props) {
     if (renderTaskRef.current) renderTaskRef.current.cancel()
 
     pdf.getPage(page).then((p) => {
-      const dpr = window.devicePixelRatio || 1
       const containerWidth = canvas.parentElement?.clientWidth ?? 600
       const vp = p.getViewport({ scale: 1 })
-      const scale = containerWidth / vp.width
-      const scaled = p.getViewport({ scale: scale * dpr })
+      const scale = (containerWidth / vp.width) * 2
+      const scaled = p.getViewport({ scale })
       canvas.width = scaled.width
       canvas.height = scaled.height
-      canvas.style.width = `${scaled.width / dpr}px`
-      canvas.style.height = `${scaled.height / dpr}px`
-      setCanvasSize({ w: scaled.width / dpr, h: scaled.height / dpr })
+      canvas.style.width = `${containerWidth}px`
+      canvas.style.height = `${scaled.height / 2}px`
+      setCanvasSize({ w: containerWidth, h: scaled.height / 2 })
       const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
       renderTaskRef.current = task
       task.promise.catch(() => null)
