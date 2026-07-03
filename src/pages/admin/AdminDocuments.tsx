@@ -17,7 +17,7 @@ export default function AdminDocuments() {
   const [docs, setDocs] = useState<SafetyDocument[]>([])
 
   async function loadDocs() {
-    const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false }).limit(30)
+    const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false })
     setDocs(data ?? [])
   }
 

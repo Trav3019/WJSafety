@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload, Search, X } from 'lucide-react'
+import { ArrowLeft, FileText, FolderOpen, CloudCheck, CloudDownload, Search, X, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { SafetyDocument } from '../lib/types'
 import { cacheFile, getCachedFile, isCached } from '../lib/offlineDb'
+import { useAuth } from '../context/AuthContext'
 import PdfViewer from '../components/PdfViewer'
 import ExcelViewer from '../components/ExcelViewer'
 import WordViewer from '../components/WordViewer'
@@ -18,6 +19,8 @@ function formatSize(bytes: number | null) {
 export default function DocumentCategory() {
   const { categoryId } = useParams()
   const location = useLocation()
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const categoryName = (location.state as { name?: string } | null)?.name ?? 'Documents'
   const [docs, setDocs] = useState<SafetyDocument[]>([])
   const [search, setSearch] = useState('')
@@ -100,6 +103,14 @@ export default function DocumentCategory() {
     setViewer(null)
   }
 
+  async function deleteDoc(doc: SafetyDocument, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!confirm(`Delete "${doc.title}"?`)) return
+    await supabase.storage.from('documents').remove([doc.storage_path])
+    await supabase.from('documents').delete().eq('id', doc.id)
+    setDocs((d) => d.filter((x) => x.id !== doc.id))
+  }
+
   async function downloadForOffline(doc: SafetyDocument, e: React.MouseEvent) {
     e.stopPropagation()
     setBusy(doc.id)
@@ -178,7 +189,7 @@ export default function DocumentCategory() {
                 {doc.description && <p className="text-xs text-gray-500 truncate">{doc.description}</p>}
                 <p className="text-xs text-gray-400 mt-0.5">{formatSize(doc.file_size_bytes)}</p>
               </div>
-              <div className="shrink-0">
+              <div className="shrink-0 flex items-center gap-2">
                 {busy === doc.id ? (
                   <span className="text-xs text-gray-400">…</span>
                 ) : cachedMap[doc.id] ? (
@@ -193,6 +204,15 @@ export default function DocumentCategory() {
                     title="Save for offline"
                   >
                     <CloudDownload size={14} />
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={(e) => deleteDoc(doc, e)}
+                    className="text-red-400 hover:text-red-600 transition-colors"
+                    title="Delete document"
+                  >
+                    <Trash2 size={15} />
                   </button>
                 )}
               </div>
