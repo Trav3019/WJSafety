@@ -22,7 +22,10 @@ webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
 Deno.serve(async (req) => {
-  if (req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  // Accept either a DB webhook secret (from triggers) or a valid user JWT (from the app)
+  const webhookSecret = req.headers.get('x-webhook-secret')
+  const hasAuth = req.headers.get('Authorization')?.startsWith('Bearer ')
+  if (webhookSecret !== WEBHOOK_SECRET && !hasAuth) {
     return new Response('Unauthorized', { status: 401 })
   }
 

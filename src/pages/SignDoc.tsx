@@ -5,18 +5,7 @@ import { Send, RotateCcw, X, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import SignatureCanvas, { type SignatureCanvasHandle } from '../components/SignatureCanvas'
-
-interface SignField {
-  id: string
-  page: number
-  x: number
-  y: number
-  width: number
-  height: number
-  type: 'signature' | 'initials' | 'date' | 'text'
-  label: string
-  sort_order: number
-}
+import PdfSignViewer, { type SignField } from '../components/PdfSignViewer'
 
 interface Assignment {
   id: string
@@ -159,7 +148,6 @@ export default function SignDoc() {
         status: 'signed', signed_at: new Date().toISOString(), signed_pdf_path: signedPath,
       }).eq('id', assignment.id)
 
-      // Notify admins
       supabase.functions.invoke('send-push', {
         body: {
           type: 'doc_signed',
@@ -184,13 +172,15 @@ export default function SignDoc() {
 
   return (
     <>
-      {/* Field modal — signature/initials or text input */}
+      {/* Field modal */}
       {activeField && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
           <div className="bg-white w-full rounded-t-2xl p-5 space-y-3">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-gray-800">{activeField.label}</p>
-              <button onClick={() => { setActiveField(null); setTextDraft('') }}><X size={20} className="text-gray-400" /></button>
+              <button onClick={() => { setActiveField(null); setTextDraft('') }}>
+                <X size={20} className="text-gray-400" />
+              </button>
             </div>
 
             {isTextField ? (
@@ -240,64 +230,50 @@ export default function SignDoc() {
           </div>
         ) : (
           <>
-            {/* PDF viewer — native browser renderer, no PDF.js */}
-            {error && !pdfBlobUrl ? (
+            {error && !pdfBlobUrl && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
-            ) : pdfBlobUrl ? (
-              <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm mb-4">
-                <iframe
-                  src={pdfBlobUrl}
-                  className="w-full"
-                  style={{ height: '55vh', border: 'none' }}
-                  title={assignment.sign_requests.title}
-                />
-              </div>
-            ) : null}
+            )}
 
-            {/* Fields to fill */}
+            {/* PDF with interactive field overlays */}
+            {pdfBlobUrl && (
+              <PdfSignViewer
+                blobUrl={pdfBlobUrl}
+                fields={fields}
+                values={values}
+                onFieldTap={handleFieldTap}
+              />
+            )}
+
+            {/* Progress summary */}
             {fields.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm font-semibold text-gray-600 mb-2">
-                  Fields to complete — {completedCount}/{fields.length} done
-                </p>
-                <div className="space-y-2">
+              <div className="mb-4 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-gray-600">
+                    {completedCount}/{fields.length} fields completed
+                  </p>
+                  {allFilled && (
+                    <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                      <CheckCircle2 size={13} /> All done
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
                   {fields.map((f) => {
                     const filled = !!values[f.id]
-                    const colors = TYPE_COLORS[f.type]
-                    const borderColor = colors.includes('emerald') ? 'border-emerald-400'
-                      : colors.includes('blue') ? 'border-blue-400'
-                      : colors.includes('violet') ? 'border-violet-400'
-                      : 'border-amber-400'
+                    const colors = TYPE_COLORS[f.type as keyof typeof TYPE_COLORS] ?? 'border-gray-300 bg-gray-50 text-gray-600'
                     return (
                       <button
                         key={f.id}
                         type="button"
                         onClick={() => handleFieldTap(f)}
-                        className={`w-full flex items-center gap-3 border rounded-xl px-4 py-3 text-left transition-all ${
-                          filled ? 'border-gray-200 bg-white' : `${colors} border-2`
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                          filled ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : colors
                         }`}
                       >
-                        <div className="shrink-0">
-                          {filled
-                            ? <CheckCircle2 size={20} className="text-emerald-500" />
-                            : <div className={`w-5 h-5 rounded-full border-2 ${borderColor}`} />
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800">{f.label}</p>
-                          <p className="text-xs text-gray-400 capitalize">{f.type} · Page {f.page}</p>
-                        </div>
-                        {filled && (f.type === 'date' || f.type === 'text') && (
-                          <span className="text-sm text-gray-600 truncate max-w-[40%]">{values[f.id]}</span>
-                        )}
-                        {filled && (f.type === 'signature' || f.type === 'initials') && values[f.id]?.startsWith('data:') && (
-                          <img src={values[f.id]} alt="signature" className="h-8 object-contain" />
-                        )}
-                        {!filled && (
-                          <span className="text-xs font-medium opacity-70">Tap to fill</span>
-                        )}
+                        {filled && <CheckCircle2 size={11} />}
+                        {f.label}
                       </button>
                     )
                   })}
@@ -316,7 +292,9 @@ export default function SignDoc() {
               {submitting ? 'Saving…' : 'Submit signed document'}
             </button>
             {!allFilled && fields.length > 0 && (
-              <p className="text-xs text-center text-gray-400 mt-2">Fill in all {fields.length} fields to submit</p>
+              <p className="text-xs text-center text-gray-400 mt-2">
+                Tap the highlighted fields on the document above to fill them in
+              </p>
             )}
           </>
         )}
