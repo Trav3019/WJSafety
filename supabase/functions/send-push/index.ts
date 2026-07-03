@@ -79,10 +79,14 @@ Deno.serve(async (req) => {
     ),
   )
 
-  // Drop subscriptions that are no longer valid (browser unsubscribed, etc.)
+  // Drop subscriptions that are no longer valid
   const expired = (subs ?? []).filter((_, i) => {
     const r = results[i]
-    return r.status === 'rejected' && [404, 410].includes((r.reason as { statusCode?: number })?.statusCode ?? 0)
+    if (r.status === 'rejected') {
+      console.error('Push failed:', r.reason)
+      return [401, 404, 410].includes((r.reason as { statusCode?: number })?.statusCode ?? 0)
+    }
+    return false
   })
   if (expired.length) {
     await supabase

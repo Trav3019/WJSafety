@@ -26,13 +26,12 @@ export async function subscribeToPush(userId: string) {
   if (permission !== 'granted') throw new Error('Notification permission denied.')
 
   const registration = await navigator.serviceWorker.ready
-  let subscription = await registration.pushManager.getSubscription()
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
-    })
-  }
+  const existing = await registration.pushManager.getSubscription()
+  if (existing) await existing.unsubscribe()
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
+  })
 
   const json = subscription.toJSON()
   await supabase.from('push_subscriptions').upsert(
