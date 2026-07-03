@@ -108,7 +108,11 @@ export default function DocumentCategory() {
     if (!confirm(`Delete "${doc.title}"?`)) return
     await supabase.storage.from('documents').remove([doc.storage_path])
     await supabase.from('documents').delete().eq('id', doc.id)
-    setDocs((d) => d.filter((x) => x.id !== doc.id))
+    setDocs((d) => {
+      const updated = d.filter((x) => x.id !== doc.id)
+      localStorage.setItem(`wjs_docs_${categoryId}`, JSON.stringify(updated))
+      return updated
+    })
   }
 
   async function downloadForOffline(doc: SafetyDocument, e: React.MouseEvent) {
