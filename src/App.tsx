@@ -50,6 +50,7 @@ function App() {
                 <Route path="/admin/worker-files" element={<AdminWorkerFiles />} />
                 <Route path="/admin/worker-files/:workerId" element={<AdminWorkerFiles />} />
                 <Route path="/admin/incidents" element={<AdminIncidents />} />
+                <Route path="/admin/incidents/:workerId" element={<AdminIncidents />} />
               </Route>
             </Route>
           </Route>

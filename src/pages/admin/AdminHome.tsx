@@ -15,12 +15,11 @@ export default function AdminHome() {
   const [incidentCount, setIncidentCount] = useState(0)
 
   useEffect(() => {
-    // Count reports submitted in the last 7 days as "new"
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    // Count unreviewed reports
     supabase
       .from('incident_reports')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', since)
+      .is('reviewed_at', null)
       .then(({ count }) => setIncidentCount(count ?? 0))
   }, [])
 
@@ -37,7 +36,7 @@ export default function AdminHome() {
           <AlertTriangle size={22} className="shrink-0" />
           <div className="flex-1">
             <p className="font-bold text-sm">
-              {incidentCount} Incident Report{incidentCount !== 1 ? 's' : ''} in the last 7 days
+              {incidentCount} Unreviewed Incident Report{incidentCount !== 1 ? 's' : ''}
             </p>
             <p className="text-red-100 text-xs">Tap to view and review</p>
           </div>
