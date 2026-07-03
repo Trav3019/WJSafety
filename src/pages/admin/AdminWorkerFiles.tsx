@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Clock, UserRound, Download, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, UserRound, Download, Trash2, Search, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../lib/types'
 
@@ -13,18 +13,12 @@ interface SignAssignment {
   sign_requests: { title: string; pdf_path: string }
 }
 
-interface FormSubmission {
-  id: string
-  submitted_at: string
-  form_templates?: { title: string }
-}
-
 function WorkerDetail() {
   const { workerId } = useParams()
   const [worker, setWorker] = useState<Profile | null>(null)
   const [signs, setSigns] = useState<SignAssignment[]>([])
-  const [submissions, setSubmissions] = useState<FormSubmission[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     if (!workerId) return
@@ -35,15 +29,9 @@ function WorkerDetail() {
         .select('*, sign_requests(title, pdf_path)')
         .eq('assigned_to', workerId)
         .order('created_at', { ascending: false }),
-      supabase
-        .from('form_submissions')
-        .select('*, form_templates(title)')
-        .eq('submitted_by', workerId)
-        .order('submitted_at', { ascending: false }),
-    ]).then(([{ data: w }, { data: s }, { data: f }]) => {
+    ]).then(([{ data: w }, { data: s }]) => {
       setWorker(w as unknown as Profile)
       setSigns((s as unknown as SignAssignment[]) ?? [])
-      setSubmissions((f as unknown as FormSubmission[]) ?? [])
       setLoading(false)
     })
   }, [workerId])
@@ -68,15 +56,12 @@ function WorkerDetail() {
     setSigns((prev) => prev.filter((x) => x.id !== s.id))
   }
 
-  async function deleteFormSubmission(sub: FormSubmission) {
-    if (!confirm(`Delete "${sub.form_templates?.title ?? 'this form'}" submission?`)) return
-    const { error } = await supabase.from('form_submissions').delete().eq('id', sub.id)
-    if (error) { alert('Delete failed: ' + error.message); return }
-    setSubmissions((prev) => prev.filter((x) => x.id !== sub.id))
-  }
-
   if (loading) return <p className="text-gray-500">Loading…</p>
   if (!worker) return <p className="text-gray-500">Worker not found.</p>
+
+  const filteredSigns = signs.filter((s) =>
+    !search.trim() || s.sign_requests?.title?.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
     <div>
@@ -94,10 +79,35 @@ function WorkerDetail() {
         </div>
       </div>
 
-      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">PDF Sign Requests</h2>
-      {signs.length === 0 && <p className="text-sm text-gray-400 mb-4">No sign requests assigned.</p>}
-      <div className="space-y-2 mb-6">
-        {signs.map((s) => (
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase">Documents</h2>
+        <span className="text-xs text-gray-400">
+          {signs.filter((s) => s.status === 'signed').length}/{signs.length} signed
+        </span>
+      </div>
+
+      {signs.length > 0 && (
+        <div className="relative mb-3">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search documents…"
+            className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {signs.length === 0 && <p className="text-sm text-gray-400">No documents assigned.</p>}
+      {filteredSigns.length === 0 && search && <p className="text-sm text-gray-400">No results for "{search}".</p>}
+
+      <div className="space-y-2">
+        {filteredSigns.map((s) => (
           <div key={s.id} className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               {s.status === 'signed' ? (
@@ -135,31 +145,6 @@ function WorkerDetail() {
           </div>
         ))}
       </div>
-
-      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">Submitted Forms</h2>
-      {submissions.length === 0 && <p className="text-sm text-gray-400">No submitted forms.</p>}
-      <div className="space-y-2">
-        {submissions.map((sub) => (
-          <div key={sub.id} className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-              <div className="min-w-0">
-                <p className="font-medium text-gray-800 text-sm truncate">{sub.form_templates?.title ?? 'Form'}</p>
-                <p className="text-xs text-gray-400">
-                  Submitted {new Date(sub.submitted_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => deleteFormSubmission(sub)}
-              className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
-              title="Delete submission"
-            >
-              <Trash2 size={15} />
-            </button>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
@@ -169,6 +154,7 @@ export default function AdminWorkerFiles() {
   const [workers, setWorkers] = useState<Profile[]>([])
   const [signCounts, setSignCounts] = useState<Record<string, { signed: number; total: number }>>({})
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     if (workerId) return
@@ -190,6 +176,10 @@ export default function AdminWorkerFiles() {
 
   if (workerId) return <WorkerDetail />
 
+  const filteredWorkers = workers.filter((w) =>
+    !search.trim() || w.full_name.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div>
       <Link to="/admin" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
@@ -197,9 +187,25 @@ export default function AdminWorkerFiles() {
         Admin
       </Link>
       <h1 className="text-xl font-bold text-gray-900 mb-4">Worker Files</h1>
+
+      <div className="relative mb-3">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search workers…"
+          className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
       {loading && <p className="text-gray-500">Loading…</p>}
       <div className="space-y-2">
-        {workers.map((w) => {
+        {filteredWorkers.map((w) => {
           const c = signCounts[w.id]
           return (
             <Link
@@ -215,7 +221,7 @@ export default function AdminWorkerFiles() {
                 <p className="text-xs text-gray-500 capitalize">{w.role}</p>
               </div>
               {c && (
-                <span className="text-xs text-gray-500 shrink-0">
+                <span className={`text-xs font-medium shrink-0 ${c.signed === c.total ? 'text-emerald-600' : 'text-amber-500'}`}>
                   {c.signed}/{c.total} signed
                 </span>
               )}
