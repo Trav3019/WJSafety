@@ -46,6 +46,17 @@ Deno.serve(async (req) => {
     title = `${payload.commenter_name} commented on your post`
     body = ''
     query = query.eq('user_id', payload.user_id)
+  } else if (payload.type === 'doc_signed') {
+    title = `${payload.worker_name} signed a document`
+    body = payload.doc_title
+    // Send to all admins — join through profiles table
+    const { data: adminProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'admin')
+    const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
+    if (adminIds.length === 0) return new Response('no admins', { status: 200 })
+    query = query.in('user_id', adminIds)
   } else {
     return new Response('Unknown event type', { status: 400 })
   }

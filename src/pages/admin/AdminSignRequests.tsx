@@ -1,24 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Upload, Users, CheckCircle2, Clock, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Upload, Users, CheckCircle2, Clock, ChevronRight, Search, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import type { Profile } from '../../lib/types'
 import PdfFieldEditor, { type PlacedField } from '../../components/PdfFieldEditor'
+
+interface SignAssignment {
+  id: string
+  status: string
+  signed_at: string | null
+  profiles?: { full_name: string } | null
+}
 
 interface SignRequest {
   id: string
   title: string
   pdf_path: string
   created_at: string
-}
-
-interface SignAssignment {
-  id: string
-  request_id: string
-  status: string
-  signed_at: string | null
-  profiles?: { full_name: string } | null
+  sign_assignments: SignAssignment[]
 }
 
 type Step = 'details' | 'fields'
@@ -28,8 +28,8 @@ export default function AdminSignRequests() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [workers, setWorkers] = useState<Profile[]>([])
   const [requests, setRequests] = useState<SignRequest[]>([])
-  const [assignments, setAssignments] = useState<SignAssignment[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   // Step 1 state
   const [step, setStep] = useState<Step>('details')
@@ -45,14 +45,15 @@ export default function AdminSignRequests() {
   const [message, setMessage] = useState<string | null>(null)
 
   async function load() {
-    const [{ data: reqs }, { data: ws }, { data: asgns }] = await Promise.all([
-      supabase.from('sign_requests').select('*').order('created_at', { ascending: false }),
+    const [{ data: reqs }, { data: ws }] = await Promise.all([
+      supabase
+        .from('sign_requests')
+        .select('*, sign_assignments(id, status, signed_at, profiles(full_name))')
+        .order('created_at', { ascending: false }),
       supabase.from('profiles').select('*').eq('status', 'approved').neq('role', 'admin'),
-      supabase.from('sign_assignments').select('*, profiles(full_name)'),
     ])
     setRequests((reqs as unknown as SignRequest[]) ?? [])
     setWorkers((ws as unknown as Profile[]) ?? [])
-    setAssignments((asgns as unknown as SignAssignment[]) ?? [])
   }
 
   useEffect(() => { load() }, [])
@@ -96,7 +97,6 @@ export default function AdminSignRequests() {
       .single()
     if (reqErr || !req) { setMessage('Failed to create sign request.'); setUploading(false); return }
 
-    // Save field positions
     if (fields.length > 0) {
       await supabase.from('sign_fields').insert(
         fields.map((f, i) => ({
@@ -113,7 +113,6 @@ export default function AdminSignRequests() {
       )
     }
 
-    // Create assignments
     const rows = targets.map((workerId) => ({
       request_id: req.id,
       assigned_to: workerId,
@@ -121,7 +120,6 @@ export default function AdminSignRequests() {
     }))
     await supabase.from('sign_assignments').insert(rows)
 
-    // Push notification to each assigned worker
     await Promise.allSettled(
       targets.map((workerId) =>
         supabase.functions.invoke('send-push', {
@@ -130,7 +128,6 @@ export default function AdminSignRequests() {
       )
     )
 
-    // Reset
     setTitle('')
     setFile(null)
     if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
@@ -145,9 +142,9 @@ export default function AdminSignRequests() {
     load()
   }
 
-  function assignmentsFor(requestId: string) {
-    return assignments.filter((a) => a.request_id === requestId)
-  }
+  const filteredRequests = requests.filter((r) =>
+    !search.trim() || r.title.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
     <div>
@@ -237,7 +234,7 @@ export default function AdminSignRequests() {
       {step === 'fields' && filePreviewUrl && (
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-4 mb-6">
           <p className="text-sm text-gray-600">
-            Tap the PDF below to place signature, initials, or date fields. Workers will fill these in when they sign.
+            Tap the PDF below to place signature, initials, date, or text fields. Workers will fill these in when they sign.
           </p>
 
           <PdfFieldEditor
@@ -269,12 +266,31 @@ export default function AdminSignRequests() {
       )}
 
       {/* Sent requests list */}
-      <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">Sent requests</h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase">Sent requests</h2>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search forms…"
+          className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
       {message && step === 'details' && <p className="text-sm text-emerald-700 mb-2">{message}</p>}
-      {requests.length === 0 && <p className="text-sm text-gray-400">No sign requests yet.</p>}
+      {filteredRequests.length === 0 && <p className="text-sm text-gray-400">No sign requests found.</p>}
       <div className="space-y-2">
-        {requests.map((req) => {
-          const asgns = assignmentsFor(req.id)
+        {filteredRequests.map((req) => {
+          const asgns = req.sign_assignments ?? []
           const signed = asgns.filter((a) => a.status === 'signed').length
           const isOpen = expanded === req.id
           return (
@@ -289,13 +305,18 @@ export default function AdminSignRequests() {
                     {new Date(req.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full shrink-0">
+                <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${
+                  signed === asgns.length && asgns.length > 0
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-700'
+                }`}>
                   <Users size={12} />
                   {signed}/{asgns.length} signed
                 </div>
               </button>
               {isOpen && (
                 <div className="border-t border-gray-100 px-4 py-3 space-y-1.5">
+                  {asgns.length === 0 && <p className="text-xs text-gray-400">No workers assigned.</p>}
                   {asgns.map((a) => (
                     <div key={a.id} className="flex items-center justify-between text-sm">
                       <span className="text-gray-700">{a.profiles?.full_name ?? '—'}</span>

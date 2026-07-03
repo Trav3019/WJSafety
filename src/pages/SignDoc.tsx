@@ -158,6 +158,16 @@ export default function SignDoc() {
       await supabase.from('sign_assignments').update({
         status: 'signed', signed_at: new Date().toISOString(), signed_pdf_path: signedPath,
       }).eq('id', assignment.id)
+
+      // Notify admins
+      supabase.functions.invoke('send-push', {
+        body: {
+          type: 'doc_signed',
+          worker_name: profile.full_name,
+          doc_title: assignment.sign_requests.title,
+        },
+      })
+
       navigate('/forms', { state: { signed: true } })
     } catch (e) {
       setError('Something went wrong: ' + (e instanceof Error ? e.message : String(e)))
