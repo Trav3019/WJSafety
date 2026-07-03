@@ -273,30 +273,32 @@ export default function AdminIncidents() {
 
   useEffect(() => {
     if (workerId) return
-    supabase
-      .from('incident_reports')
-      .select('submitted_by, reviewed_at, created_at, profiles!submitted_by(full_name, role)')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        const map: Record<string, WorkerSummary> = {}
-        for (const r of (data ?? []) as unknown as (IncidentReport & { profiles: { full_name: string; role: string } | null })[]) {
-          const id = r.submitted_by ?? 'unknown'
-          if (!map[id]) {
-            map[id] = {
-              id,
-              full_name: r.profiles?.full_name ?? 'Unknown',
-              role: r.profiles?.role ?? '',
-              total: 0,
-              unreviewed: 0,
-              latest: r.created_at,
-            }
+    Promise.all([
+      supabase.from('incident_reports').select('submitted_by, reviewed_at, created_at').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, full_name, role').eq('status', 'approved'),
+    ]).then(([{ data: reports }, { data: profiles }]) => {
+      const profileMap: Record<string, { full_name: string; role: string }> = {}
+      for (const p of profiles ?? []) profileMap[p.id] = { full_name: p.full_name, role: p.role }
+
+      const map: Record<string, WorkerSummary> = {}
+      for (const r of (reports ?? []) as { submitted_by: string | null; reviewed_at: string | null; created_at: string }[]) {
+        const id = r.submitted_by ?? 'unknown'
+        if (!map[id]) {
+          map[id] = {
+            id,
+            full_name: profileMap[id]?.full_name ?? 'Unknown Worker',
+            role: profileMap[id]?.role ?? '',
+            total: 0,
+            unreviewed: 0,
+            latest: r.created_at,
           }
-          map[id].total++
-          if (!r.reviewed_at) map[id].unreviewed++
         }
-        setWorkers(Object.values(map).sort((a, b) => b.unreviewed - a.unreviewed || b.latest.localeCompare(a.latest)))
-        setLoading(false)
-      })
+        map[id].total++
+        if (!r.reviewed_at) map[id].unreviewed++
+      }
+      setWorkers(Object.values(map).sort((a, b) => b.unreviewed - a.unreviewed || b.latest.localeCompare(a.latest)))
+      setLoading(false)
+    })
   }, [workerId])
 
   if (workerId) return <WorkerIncidents />
