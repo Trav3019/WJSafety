@@ -4,6 +4,7 @@ import { PDFDocument, rgb } from 'pdf-lib'
 import { Send, RotateCcw, X, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { logNotif, getAdminIds } from '../lib/notifLog'
 import SignatureCanvas, { type SignatureCanvasHandle } from '../components/SignatureCanvas'
 import PdfSignViewer, { type SignField } from '../components/PdfSignViewer'
 
@@ -149,13 +150,12 @@ export default function SignDoc() {
       }).eq('id', assignment.id)
 
       // Notify admins that the document was signed
+      const signTitle = `${profile.full_name} signed a document`
+      const signBody = assignment.sign_requests.title
       await supabase.functions.invoke('Send-Push', {
-        body: {
-          type: 'doc_signed',
-          worker_name: profile.full_name,
-          doc_title: assignment.sign_requests.title,
-        },
+        body: { type: 'doc_signed', worker_name: profile.full_name, doc_title: signBody },
       })
+      getAdminIds().then((ids) => logNotif(ids, signTitle, signBody))
 
       navigate('/forms', { state: { signed: true } })
     } catch (e) {

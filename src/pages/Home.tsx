@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Pin, ImagePlus, Send, Trash2, X, MessageCircle, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { logNotif } from '../lib/notifLog'
 import type { NewsPost, PostComment } from '../lib/types'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -53,14 +54,11 @@ function CommentSection({ postId, postedBy, initialCount }: { postId: string; po
     })
     // Notify the post author if it's not the commenter themselves
     if (postedBy && postedBy !== profile?.id) {
+      const commenter = profile?.full_name ?? 'Someone'
       supabase.functions.invoke('Send-Push', {
-        body: {
-          type: 'comment_posted',
-          user_id: postedBy,
-          commenter_name: profile?.full_name ?? 'Someone',
-          post_id: postId,
-        },
+        body: { type: 'comment_posted', user_id: postedBy, commenter_name: commenter, post_id: postId },
       })
+      logNotif(postedBy, `${commenter} commented on your post`, body.trim())
     }
     setBody('')
     setSending(false)

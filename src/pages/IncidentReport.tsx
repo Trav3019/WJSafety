@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Send, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { logNotif, getAdminIds } from '../lib/notifLog'
 
 const INCIDENT_TYPES = ['Injury', 'Near Miss', 'Property Damage', 'Environmental', 'Other']
 const MEDICAL_OPTIONS = ['None', 'First Aid Only', 'Doctor / Medical Centre Visit', 'Hospitalisation']
@@ -144,13 +145,12 @@ export default function IncidentReport() {
     }
 
     // Notify admins
+    const workerName = profile?.full_name ?? 'A worker'
+    const incidentTitle = `Incident report: ${form.incident_type}`
     supabase.functions.invoke('Send-Push', {
-      body: {
-        type: 'incident_submitted',
-        worker_name: profile?.full_name ?? 'A worker',
-        incident_type: form.incident_type,
-      },
+      body: { type: 'incident_submitted', worker_name: workerName, incident_type: form.incident_type },
     })
+    getAdminIds().then((ids) => logNotif(ids, incidentTitle, `Submitted by ${workerName}`))
 
     setDone(true)
     setSubmitting(false)

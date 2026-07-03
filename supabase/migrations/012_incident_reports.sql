@@ -38,4 +38,6 @@ alter table notification_log enable row level security;
 create policy "users can view own notifications" on notification_log
   for select using (auth.uid() = user_id);
 
--- Service role (used by edge function) bypasses RLS for inserts
+-- Allow any authenticated user to insert notifications (app logs cross-user notifications)
+create policy "authenticated can insert notifications" on notification_log
+  for insert to authenticated with check (true);

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, Upload, Users, CheckCircle2, Clock, ChevronRight, Search, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { logNotif } from '../../lib/notifLog'
 import type { Profile } from '../../lib/types'
 import PdfFieldEditor, { type PlacedField } from '../../components/PdfFieldEditor'
 
@@ -128,6 +129,7 @@ export default function AdminSignRequests() {
         })
       )
     )
+    logNotif(targets, 'Document ready to sign', title.trim())
 
     setTitle('')
     setFile(null)
