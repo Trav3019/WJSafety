@@ -150,10 +150,17 @@ function WorkerDetail() {
   )
 }
 
+interface SignRequest {
+  id: string
+  title: string
+  created_at: string
+  sign_assignments: (SignAssignment & { profiles?: { full_name: string } | null })[]
+}
+
 export default function AdminWorkerFiles() {
   const { workerId } = useParams()
   const [workers, setWorkers] = useState<Profile[]>([])
-  const [allAssignments, setAllAssignments] = useState<SignAssignment[]>([])
+  const [signRequests, setSignRequests] = useState<SignRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'by-worker' | 'by-document'>('by-worker')
   const [workerSearch, setWorkerSearch] = useState('')
@@ -164,19 +171,20 @@ export default function AdminWorkerFiles() {
     Promise.all([
       supabase.from('profiles').select('*').eq('status', 'approved').order('full_name'),
       supabase
-        .from('sign_assignments')
-        .select('*, sign_requests(id, title, pdf_path), profiles!assigned_to(full_name)')
+        .from('sign_requests')
+        .select('id, title, created_at, sign_assignments(id, status, signed_at, signed_pdf_path, signature_path, assigned_to, profiles!assigned_to(full_name))')
         .order('created_at', { ascending: false }),
-    ]).then(([{ data: ws }, { data: asgns }]) => {
+    ]).then(([{ data: ws }, { data: reqs }]) => {
       setWorkers((ws as unknown as Profile[]) ?? [])
-      setAllAssignments((asgns as unknown as SignAssignment[]) ?? [])
+      setSignRequests((reqs as unknown as SignRequest[]) ?? [])
       setLoading(false)
     })
   }, [workerId])
 
   if (workerId) return <WorkerDetail />
 
-  // By-worker: group sign counts per worker
+  // Flatten all assignments for by-worker counts
+  const allAssignments = signRequests.flatMap((r) => r.sign_assignments ?? [])
   const signCounts: Record<string, { signed: number; total: number }> = {}
   for (const a of allAssignments) {
     if (!signCounts[a.assigned_to]) signCounts[a.assigned_to] = { signed: 0, total: 0 }
@@ -188,17 +196,10 @@ export default function AdminWorkerFiles() {
     !workerSearch.trim() || w.full_name.toLowerCase().includes(workerSearch.toLowerCase())
   )
 
-  // By-document: group assignments per document title
-  const docMap = new Map<string, { title: string; assignments: SignAssignment[] }>()
-  for (const a of allAssignments) {
-    const key = a.sign_requests?.id
-    if (!key) continue
-    if (!docMap.has(key)) docMap.set(key, { title: a.sign_requests.title, assignments: [] })
-    docMap.get(key)!.assignments.push(a)
-  }
-  const docs = Array.from(docMap.values()).filter((d) =>
-    !docSearch.trim() || d.title.toLowerCase().includes(docSearch.toLowerCase())
-  )
+  // By-document: already grouped by sign_requests
+  const docs = signRequests
+    .filter((r) => !docSearch.trim() || r.title.toLowerCase().includes(docSearch.toLowerCase()))
+    .map((r) => ({ title: r.title, assignments: r.sign_assignments ?? [] }))
 
   return (
     <div>
@@ -312,7 +313,7 @@ export default function AdminWorkerFiles() {
                   <div className="divide-y divide-gray-50">
                     {doc.assignments.map((a) => (
                       <div key={a.id} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="text-sm text-gray-700">{a.profiles?.full_name ?? '—'}</span>
+                        <span className="text-sm text-gray-700">{(a as SignAssignment & { profiles?: { full_name: string } | null }).profiles?.full_name ?? '—'}</span>
                         {a.status === 'signed' ? (
                           <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
                             <CheckCircle2 size={13} />
