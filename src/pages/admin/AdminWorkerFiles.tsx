@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Clock, UserRound, Download, Trash2, Search, X, FileText, Users } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, UserRound, Download, Trash2, Search, X, FileText, Users, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../lib/types'
 
@@ -165,6 +165,7 @@ export default function AdminWorkerFiles() {
   const [view, setView] = useState<'by-worker' | 'by-document'>('by-worker')
   const [workerSearch, setWorkerSearch] = useState('')
   const [docSearch, setDocSearch] = useState('')
+  const [expandedDoc, setExpandedDoc] = useState<string | null>(null)
 
   useEffect(() => {
     if (workerId) return
@@ -296,38 +297,50 @@ export default function AdminWorkerFiles() {
 
           {docs.length === 0 && <p className="text-sm text-gray-400">{docSearch ? `No documents matching "${docSearch}".` : 'No documents sent yet.'}</p>}
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {docs.map((doc) => {
               const signed = doc.assignments.filter((a) => a.status === 'signed').length
               const total = doc.assignments.length
+              const isOpen = expandedDoc === doc.title
               return (
                 <div key={doc.title} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-                    <p className="font-medium text-gray-800 text-sm">{doc.title}</p>
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      signed === total ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                    }`}>
-                      {signed}/{total} signed
-                    </span>
-                  </div>
-                  <div className="divide-y divide-gray-50">
-                    {doc.assignments.map((a) => (
-                      <div key={a.id} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="text-sm text-gray-700">{(a as SignAssignment & { profiles?: { full_name: string } | null }).profiles?.full_name ?? '—'}</span>
-                        {a.status === 'signed' ? (
-                          <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                            <CheckCircle2 size={13} />
-                            Signed {a.signed_at ? new Date(a.signed_at).toLocaleDateString() : ''}
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-amber-500 text-xs font-medium">
-                            <Clock size={13} />
-                            Pending
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 text-left"
+                    onClick={() => setExpandedDoc(isOpen ? null : doc.title)}
+                  >
+                    <div className="flex-1 min-w-0 mr-3">
+                      <p className="font-medium text-gray-800 text-sm truncate">{doc.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{total} worker{total !== 1 ? 's' : ''} assigned</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                        signed === total && total > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {signed}/{total} signed
+                      </span>
+                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-gray-100 divide-y divide-gray-50">
+                      {doc.assignments.map((a) => (
+                        <div key={a.id} className="flex items-center justify-between px-4 py-2.5">
+                          <span className="text-sm text-gray-700">{(a as SignAssignment & { profiles?: { full_name: string } | null }).profiles?.full_name ?? '—'}</span>
+                          {a.status === 'signed' ? (
+                            <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                              <CheckCircle2 size={13} />
+                              Signed {a.signed_at ? new Date(a.signed_at).toLocaleDateString() : ''}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-amber-500 text-xs font-medium">
+                              <Clock size={13} />
+                              Pending
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
