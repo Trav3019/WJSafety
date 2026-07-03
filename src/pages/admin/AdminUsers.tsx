@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check, X, UserRound } from 'lucide-react'
+import { ArrowLeft, Check, X, UserRound, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Profile, UserRole } from '../../lib/types'
 
@@ -26,6 +26,12 @@ export default function AdminUsers() {
   async function setRole(id: string, role: UserRole) {
     await supabase.from('profiles').update({ role }).eq('id', id)
     load()
+  }
+
+  async function deleteUser(id: string, name: string) {
+    if (!confirm(`Delete user "${name}"? They can re-register in the future.`)) return
+    await supabase.rpc('delete_user_account', { target_user_id: id })
+    setUsers((u) => u.filter((x) => x.id !== id))
   }
 
   return (
@@ -56,7 +62,7 @@ export default function AdminUsers() {
                 {u.status}
               </span>
             </div>
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
               <select
                 value={u.role}
                 onChange={(e) => setRole(u.id, e.target.value as UserRole)}
@@ -84,6 +90,13 @@ export default function AdminUsers() {
                   Reject
                 </button>
               )}
+              <button
+                onClick={() => deleteUser(u.id, u.full_name)}
+                className="ml-auto flex items-center gap-1 text-xs text-red-500 hover:bg-red-50 rounded-lg px-2.5 py-1.5 font-medium transition-colors"
+              >
+                <Trash2 size={13} />
+                Delete
+              </button>
             </div>
           </div>
         ))}
