@@ -119,7 +119,15 @@ export default function AdminSignRequests() {
       assigned_by: profile?.id,
     }))
     await supabase.from('sign_assignments').insert(rows)
-    // Notification is fired by DB trigger on sign_assignments insert
+
+    // Notify each assigned worker
+    await Promise.allSettled(
+      targets.map((workerId) =>
+        supabase.functions.invoke('send-push', {
+          body: { type: 'sign_assigned', user_id: workerId, title: title.trim() },
+        })
+      )
+    )
 
     setTitle('')
     setFile(null)

@@ -148,7 +148,15 @@ export default function SignDoc() {
         status: 'signed', signed_at: new Date().toISOString(), signed_pdf_path: signedPath,
       }).eq('id', assignment.id)
 
-      // Notification is fired by DB trigger on sign_assignments update
+      // Notify admins that the document was signed
+      await supabase.functions.invoke('send-push', {
+        body: {
+          type: 'doc_signed',
+          worker_name: profile.full_name,
+          doc_title: assignment.sign_requests.title,
+        },
+      })
+
       navigate('/forms', { state: { signed: true } })
     } catch (e) {
       setError('Something went wrong: ' + (e instanceof Error ? e.message : String(e)))
