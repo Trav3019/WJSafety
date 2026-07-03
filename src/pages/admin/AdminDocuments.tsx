@@ -87,6 +87,15 @@ export default function AdminDocuments() {
     loadDocs()
   }
 
+  const [dragging, setDragging] = useState(false)
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    const dropped = Array.from(e.dataTransfer.files)
+    if (dropped.length) { setFiles(dropped); setProgress({}); setError(null) }
+  }
+
   const allDone = files.length > 0 && files.every((f) => progress[f.name] === 'done')
   const hasErrors = files.some((f) => progress[f.name] === 'error')
 
@@ -113,12 +122,17 @@ export default function AdminDocuments() {
         </div>
 
         {/* File drop zone — input is visible but covers the whole zone for iOS compatibility */}
-        <label className="block border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer hover:border-emerald-400 transition-colors relative">
+        <label
+          className={`block border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors relative ${dragging ? 'border-emerald-500 bg-emerald-50' : 'border-gray-300 hover:border-emerald-400'}`}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+        >
           <Upload size={22} className="mx-auto text-gray-400 mb-1 pointer-events-none" />
           <p className="text-sm text-gray-500 pointer-events-none">
             {files.length > 0
-              ? `${files.length} file${files.length > 1 ? 's' : ''} selected — tap to change`
-              : 'Tap to select files — you can pick multiple at once'}
+              ? `${files.length} file${files.length > 1 ? 's' : ''} selected — tap or drop to change`
+              : dragging ? 'Drop files here' : 'Tap or drag & drop files here'}
           </p>
           <input
             ref={fileRef}
