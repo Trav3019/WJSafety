@@ -270,18 +270,22 @@ export default function AdminIncidents() {
   const navigate = useNavigate()
   const [workers, setWorkers] = useState<WorkerSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (workerId) return
     Promise.all([
-      supabase.from('incident_reports').select('submitted_by, reviewed_at, created_at').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, full_name, role').eq('status', 'approved'),
-    ]).then(([{ data: reports }, { data: profiles }]) => {
+      supabase.from('incident_reports').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, full_name, role'),
+    ]).then(([{ data: reports, error: rErr }, { data: profiles, error: pErr }]) => {
+      if (rErr) { setLoadError(rErr.message); setLoading(false); return }
+      if (pErr) { setLoadError(pErr.message); setLoading(false); return }
+
       const profileMap: Record<string, { full_name: string; role: string }> = {}
       for (const p of profiles ?? []) profileMap[p.id] = { full_name: p.full_name, role: p.role }
 
       const map: Record<string, WorkerSummary> = {}
-      for (const r of (reports ?? []) as { submitted_by: string | null; reviewed_at: string | null; created_at: string }[]) {
+      for (const r of (reports ?? []) as IncidentReport[]) {
         const id = r.submitted_by ?? 'unknown'
         if (!map[id]) {
           map[id] = {
@@ -323,7 +327,14 @@ export default function AdminIncidents() {
 
       {loading && <p className="text-gray-500 text-sm">Loading…</p>}
 
-      {!loading && workers.length === 0 && (
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+          <p className="font-semibold mb-1">Error loading reports:</p>
+          <p className="font-mono text-xs">{loadError}</p>
+        </div>
+      )}
+
+      {!loading && !loadError && workers.length === 0 && (
         <div className="text-center text-gray-400 text-sm bg-white border border-gray-100 rounded-xl p-8">
           No incident reports submitted yet.
         </div>
