@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
-import { Users, UploadCloud, ChevronRight, FileSignature, FolderOpen, type LucideIcon } from 'lucide-react'
+import { Users, UploadCloud, ChevronRight, FileSignature, FolderOpen, AlertTriangle, type LucideIcon } from 'lucide-react'
 
-const links: { to: string; label: string; desc: string; icon: LucideIcon }[] = [
+const links: { to: string; label: string; desc: string; icon: LucideIcon; red?: boolean }[] = [
   { to: '/admin/users', label: 'Manage Users', desc: 'Approve new accounts and set roles', icon: Users },
   { to: '/admin/documents', label: 'Upload Documents', desc: 'Add SDS, plans, inventories and more', icon: UploadCloud },
   { to: '/admin/sign-requests', label: 'PDF Sign Requests', desc: 'Upload a PDF and send it to workers to sign', icon: FileSignature },
   { to: '/admin/worker-files', label: 'Worker Files', desc: 'View completed documents per employee', icon: FolderOpen },
+  { to: '/admin/incidents', label: 'Incident Reports', desc: 'View and print incident reports submitted by workers', icon: AlertTriangle, red: true },
 ]
 
 export default function AdminHome() {
@@ -20,7 +21,7 @@ export default function AdminHome() {
             to={l.to}
             className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 hover:border-emerald-300 hover:shadow-md transition-all"
           >
-            <div className="bg-emerald-50 text-emerald-700 rounded-full p-2.5 shrink-0">
+            <div className={`${l.red ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'} rounded-full p-2.5 shrink-0`}>
               <l.icon size={20} />
             </div>
             <div className="flex-1">

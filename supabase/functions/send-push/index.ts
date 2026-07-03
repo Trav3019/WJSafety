@@ -1,14 +1,3 @@
-// Supabase Edge Function: sends a web push notification to subscribed
-// devices when a news post is created (everyone) or a form is assigned
-// (just that worker). Triggered by the SQL triggers in
-// supabase/migrations/002_push_notifications.sql.
-//
-// Deploy with: supabase functions deploy send-push
-// Required secrets (supabase secrets set ...):
-//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (e.g. mailto:you@example.com)
-//   WEBHOOK_SECRET (must match app.settings.edge_function_secret from the migration)
-//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (SUPABASE_* are auto-provided by the platform)
-
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3'
 
@@ -20,6 +9,44 @@ const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET')!
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+async function logNotification(userId: string, title: string, body: string) {
+  await supabase.from('notification_log').insert({ user_id: userId, title, body })
+}
+
+async function sendToSubs(
+  subs: { id: string; endpoint: string; p256dh: string; auth: string; user_id: string }[],
+  title: string,
+  body: string,
+) {
+  const results = await Promise.allSettled(
+    subs.map((sub) =>
+      webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        JSON.stringify({ title, body }),
+      )
+    )
+  )
+
+  // Log to notification_log for each unique user
+  const userIds = [...new Set(subs.map((s) => s.user_id))]
+  await Promise.allSettled(userIds.map((uid) => logNotification(uid, title, body)))
+
+  // Drop expired subscriptions
+  const expired = subs.filter((_, i) => {
+    const r = results[i]
+    if (r.status === 'rejected') {
+      console.error('Push failed:', r.reason)
+      return [401, 404, 410].includes((r.reason as { statusCode?: number })?.statusCode ?? 0)
+    }
+    return false
+  })
+  if (expired.length) {
+    await supabase.from('push_subscriptions').delete().in('id', expired.map((s) => s.id))
+  }
+
+  return results.length
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -61,11 +88,14 @@ Deno.serve(async (req) => {
   } else if (payload.type === 'doc_signed') {
     title = `${payload.worker_name} signed a document`
     body = payload.doc_title
-    // Send to all admins — join through profiles table
-    const { data: adminProfiles } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('role', 'admin')
+    const { data: adminProfiles } = await supabase.from('profiles').select('id').eq('role', 'admin')
+    const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
+    if (adminIds.length === 0) return new Response('no admins', { status: 200 })
+    query = query.in('user_id', adminIds)
+  } else if (payload.type === 'incident_submitted') {
+    title = `Incident report: ${payload.incident_type}`
+    body = `Submitted by ${payload.worker_name}`
+    const { data: adminProfiles } = await supabase.from('profiles').select('id').eq('role', 'admin')
     const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
     if (adminIds.length === 0) return new Response('no admins', { status: 200 })
     query = query.in('user_id', adminIds)
@@ -86,14 +116,16 @@ Deno.serve(async (req) => {
       const { data: workerSubs } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId)
       const count = titles.length
       const notifBody = titles.slice(0, 2).join(', ') + (count > 2 ? ` and ${count - 2} more` : '')
+      const notifTitle = `You have ${count} unsigned document${count > 1 ? 's' : ''}`
       await Promise.allSettled(
         (workerSubs ?? []).map((sub) =>
           webpush.sendNotification(
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            JSON.stringify({ title: `You have ${count} unsigned document${count > 1 ? 's' : ''}`, body: notifBody }),
+            JSON.stringify({ title: notifTitle, body: notifBody }),
           )
         )
       )
+      await logNotification(userId, notifTitle, notifBody)
       notified++
     }
     return new Response(JSON.stringify({ notified }), { headers: { 'Content-Type': 'application/json' } })
@@ -104,35 +136,6 @@ Deno.serve(async (req) => {
   const { data: subs, error } = await query
   if (error) return new Response(error.message, { status: 500 })
 
-  const results = await Promise.allSettled(
-    (subs ?? []).map((sub) =>
-      webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth },
-        },
-        JSON.stringify({ title, body }),
-      ),
-    ),
-  )
-
-  // Drop subscriptions that are no longer valid
-  const expired = (subs ?? []).filter((_, i) => {
-    const r = results[i]
-    if (r.status === 'rejected') {
-      console.error('Push failed:', r.reason)
-      return [401, 404, 410].includes((r.reason as { statusCode?: number })?.statusCode ?? 0)
-    }
-    return false
-  })
-  if (expired.length) {
-    await supabase
-      .from('push_subscriptions')
-      .delete()
-      .in('id', expired.map((s) => s.id))
-  }
-
-  return new Response(JSON.stringify({ sent: results.length }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
+  const sent = await sendToSubs(subs ?? [], title, body)
+  return new Response(JSON.stringify({ sent }), { headers: { 'Content-Type': 'application/json' } })
 })

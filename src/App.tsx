@@ -17,7 +17,9 @@ import AdminForms from './pages/admin/AdminForms'
 import AdminNews from './pages/admin/AdminNews'
 import AdminSignRequests from './pages/admin/AdminSignRequests'
 import AdminWorkerFiles from './pages/admin/AdminWorkerFiles'
+import AdminIncidents from './pages/admin/AdminIncidents'
 import SignDoc from './pages/SignDoc'
+import IncidentReport from './pages/IncidentReport'
 
 function App() {
   return (
@@ -36,6 +38,7 @@ function App() {
               <Route path="/forms" element={<Forms />} />
               <Route path="/forms/:assignmentId" element={<FillForm />} />
               <Route path="/sign/:assignmentId" element={<SignDoc />} />
+              <Route path="/incident-report" element={<IncidentReport />} />
 
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminHome />} />
@@ -46,6 +49,7 @@ function App() {
                 <Route path="/admin/sign-requests" element={<AdminSignRequests />} />
                 <Route path="/admin/worker-files" element={<AdminWorkerFiles />} />
                 <Route path="/admin/worker-files/:workerId" element={<AdminWorkerFiles />} />
+                <Route path="/admin/incidents" element={<AdminIncidents />} />
               </Route>
             </Route>
           </Route>

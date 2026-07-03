@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Home, FileText, ClipboardCheck, ShieldCheck, LogOut } from 'lucide-react'
+import { Home, FileText, ClipboardCheck, ShieldCheck, LogOut, Bell, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import NotificationPrompt from './NotificationPrompt'
+import NotificationHistory from './NotificationHistory'
 import { supabase } from '../lib/supabase'
 import { cacheFile, isCached } from '../lib/offlineDb'
 
@@ -10,6 +11,7 @@ const navItems = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/forms', label: 'Forms', icon: ClipboardCheck },
+  { to: '/incident-report', label: 'Report', icon: AlertTriangle },
 ]
 
 async function syncAllDocumentsOffline() {
@@ -24,6 +26,7 @@ async function syncAllDocumentsOffline() {
 
 export default function Layout() {
   const { profile, isAdmin, signOut } = useAuth()
+  const [showNotifHistory, setShowNotifHistory] = useState(false)
 
   useEffect(() => {
     if (profile?.status === 'approved') {
@@ -33,14 +36,22 @@ export default function Layout() {
 
   return (
     <div className="min-h-full flex flex-col bg-gray-50">
+      {showNotifHistory && <NotificationHistory onClose={() => setShowNotifHistory(false)} />}
       <header className="bg-emerald-800 text-white sticky top-0 z-10 shadow-md">
         <div className="max-w-4xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck size={22} className="text-emerald-300" />
             <span className="font-semibold text-lg tracking-tight">WJ Safety</span>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-2 text-sm">
             <span className="hidden sm:inline text-emerald-100">{profile?.full_name}</span>
+            <button
+              onClick={() => setShowNotifHistory(true)}
+              aria-label="Notification history"
+              className="flex items-center justify-center bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"
+            >
+              <Bell size={16} />
+            </button>
             <button
               onClick={signOut}
               aria-label="Sign out"
