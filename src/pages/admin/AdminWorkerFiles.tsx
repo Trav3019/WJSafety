@@ -28,7 +28,7 @@ function WorkerDetail() {
       supabase.from('profiles').select('*').eq('id', workerId).single(),
       supabase
         .from('sign_assignments')
-        .select('*, sign_requests(id, title, pdf_path)')
+        .select('id, status, signed_at, signature_path, signed_pdf_path, assigned_to, sign_requests(id, title, pdf_path)')
         .eq('assigned_to', workerId)
         .order('created_at', { ascending: false }),
     ]).then(([{ data: w }, { data: s }]) => {
@@ -165,7 +165,7 @@ export default function AdminWorkerFiles() {
       supabase.from('profiles').select('*').eq('status', 'approved').order('full_name'),
       supabase
         .from('sign_assignments')
-        .select('*, sign_requests(id, title, pdf_path), profiles(full_name)')
+        .select('*, sign_requests(id, title, pdf_path), profiles!assigned_to(full_name)')
         .order('created_at', { ascending: false }),
     ]).then(([{ data: ws }, { data: asgns }]) => {
       setWorkers((ws as unknown as Profile[]) ?? [])
