@@ -58,13 +58,16 @@ export default function PdfSignViewer({ blobUrl, fields, values, onFieldTap }: P
     if (renderTaskRef.current) renderTaskRef.current.cancel()
 
     pdf.getPage(page).then((p) => {
+      const dpr = window.devicePixelRatio || 1
       const containerWidth = canvas.parentElement?.clientWidth ?? window.innerWidth
       const vp = p.getViewport({ scale: 1 })
       const scale = containerWidth / vp.width
-      const scaled = p.getViewport({ scale })
+      const scaled = p.getViewport({ scale: scale * dpr })
       canvas.width = scaled.width
       canvas.height = scaled.height
-      setCanvasSize({ w: scaled.width, h: scaled.height })
+      canvas.style.width = `${scaled.width / dpr}px`
+      canvas.style.height = `${scaled.height / dpr}px`
+      setCanvasSize({ w: scaled.width / dpr, h: scaled.height / dpr })
       const task = p.render({ canvasContext: ctx, viewport: scaled, canvas })
       renderTaskRef.current = task
       task.promise.catch(() => null)
