@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Send, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -25,10 +25,72 @@ export default function IncidentReport() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const sigCanvasRef = useRef<HTMLCanvasElement>(null)
-  const [drawing, setDrawing] = useState(false)
+  const drawingRef = useRef(false)
   const [hasSig, setHasSig] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+
+  // Size canvas to its displayed size and wire up non-passive touch events
+  useEffect(() => {
+    const canvas = sigCanvasRef.current
+    if (!canvas) return
+
+    const resize = () => {
+      const { width, height } = canvas.getBoundingClientRect()
+      canvas.width = width
+      canvas.height = height
+    }
+    resize()
+
+    function getXY(e: TouchEvent | MouseEvent) {
+      const rect = canvas!.getBoundingClientRect()
+      const src = e instanceof TouchEvent ? e.touches[0] : e
+      return { x: src.clientX - rect.left, y: src.clientY - rect.top }
+    }
+
+    function onStart(e: TouchEvent | MouseEvent) {
+      e.preventDefault()
+      const ctx = canvas!.getContext('2d')!
+      const { x, y } = getXY(e)
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      drawingRef.current = true
+      setHasSig(true)
+    }
+
+    function onMove(e: TouchEvent | MouseEvent) {
+      if (!drawingRef.current) return
+      e.preventDefault()
+      const ctx = canvas!.getContext('2d')!
+      const { x, y } = getXY(e)
+      ctx.lineTo(x, y)
+      ctx.strokeStyle = '#1a1a1a'
+      ctx.lineWidth = 2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+    }
+
+    function onEnd() { drawingRef.current = false }
+
+    canvas.addEventListener('touchstart', onStart, { passive: false })
+    canvas.addEventListener('touchmove', onMove, { passive: false })
+    canvas.addEventListener('touchend', onEnd)
+    canvas.addEventListener('mousedown', onStart)
+    canvas.addEventListener('mousemove', onMove)
+    canvas.addEventListener('mouseup', onEnd)
+    canvas.addEventListener('mouseleave', onEnd)
+
+    return () => {
+      canvas.removeEventListener('touchstart', onStart)
+      canvas.removeEventListener('touchmove', onMove)
+      canvas.removeEventListener('touchend', onEnd)
+      canvas.removeEventListener('mousedown', onStart)
+      canvas.removeEventListener('mousemove', onMove)
+      canvas.removeEventListener('mouseup', onEnd)
+      canvas.removeEventListener('mouseleave', onEnd)
+    }
+  }, [])
 
   const [form, setForm] = useState({
     incident_date: '',
@@ -48,39 +110,6 @@ export default function IncidentReport() {
   function set(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }))
   }
-
-  // Signature pad helpers
-  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
-    const rect = canvas.getBoundingClientRect()
-    const src = 'touches' in e ? e.touches[0] : e
-    return { x: src.clientX - rect.left, y: src.clientY - rect.top }
-  }
-
-  function startDraw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    const canvas = sigCanvasRef.current!
-    const ctx = canvas.getContext('2d')!
-    const { x, y } = getPos(e, canvas)
-    ctx.beginPath()
-    ctx.moveTo(x, y)
-    setDrawing(true)
-    setHasSig(true)
-  }
-
-  function draw(e: React.MouseEvent | React.TouchEvent) {
-    if (!drawing) return
-    e.preventDefault()
-    const canvas = sigCanvasRef.current!
-    const ctx = canvas.getContext('2d')!
-    const { x, y } = getPos(e, canvas)
-    ctx.lineTo(x, y)
-    ctx.strokeStyle = '#1a1a1a'
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.stroke()
-  }
-
-  function endDraw() { setDrawing(false) }
 
   function clearSig() {
     const canvas = sigCanvasRef.current!
@@ -231,20 +260,8 @@ export default function IncidentReport() {
           <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Reporter Signature</h2>
           <p className="text-xs text-gray-400">Reporter: <span className="font-medium text-gray-600">{profile?.full_name}</span></p>
 
-          <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 select-none touch-none" style={{ height: 120 }}>
-            <canvas
-              ref={sigCanvasRef}
-              width={600}
-              height={120}
-              className="w-full h-full"
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={endDraw}
-              onMouseLeave={endDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={endDraw}
-            />
+          <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 select-none" style={{ height: 120 }}>
+            <canvas ref={sigCanvasRef} className="w-full h-full block cursor-crosshair" />
           </div>
           {hasSig ? (
             <button type="button" onClick={clearSig} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Clear signature</button>
