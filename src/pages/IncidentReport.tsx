@@ -105,6 +105,7 @@ export default function IncidentReport() {
     equipment_involved: '',
     contributing_factors: '',
     corrective_actions: '',
+    reporter_phone: '',
   })
 
   function set(key: string, value: string) {
@@ -193,14 +194,12 @@ export default function IncidentReport() {
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 space-y-4">
           <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Incident Details</h2>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Date" required>
-              <input type="date" className={inputCls} value={form.incident_date} onChange={(e) => set('incident_date', e.target.value)} required />
-            </Field>
-            <Field label="Time" required>
-              <input type="time" className={inputCls} value={form.incident_time} onChange={(e) => set('incident_time', e.target.value)} required />
-            </Field>
-          </div>
+          <Field label="Date" required>
+            <input type="date" className={inputCls} value={form.incident_date} onChange={(e) => set('incident_date', e.target.value)} required />
+          </Field>
+          <Field label="Time" required>
+            <input type="time" className={inputCls} value={form.incident_time} onChange={(e) => set('incident_time', e.target.value)} required />
+          </Field>
 
           <Field label="Location on Farm" required>
             <input type="text" className={inputCls} placeholder="e.g. Dairy shed, Paddock 4" value={form.location} onChange={(e) => set('location', e.target.value)} required />
@@ -257,8 +256,11 @@ export default function IncidentReport() {
         </div>
 
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 space-y-3">
-          <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Reporter Signature</h2>
-          <p className="text-xs text-gray-400">Reporter: <span className="font-medium text-gray-600">{profile?.full_name}</span></p>
+          <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Reporter Details</h2>
+          <p className="text-xs text-gray-400">Name: <span className="font-medium text-gray-600">{profile?.full_name}</span></p>
+          <Field label="Phone Number">
+            <input type="tel" className={inputCls} placeholder="e.g. 027 123 4567" value={form.reporter_phone} onChange={(e) => set('reporter_phone', e.target.value)} />
+          </Field>
 
           <div className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50 select-none" style={{ height: 120 }}>
             <canvas ref={sigCanvasRef} className="w-full h-full block cursor-crosshair" />

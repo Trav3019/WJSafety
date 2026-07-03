@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Users, UploadCloud, ChevronRight, FileSignature, FolderOpen, AlertTriangle, type LucideIcon } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 
 const links: { to: string; label: string; desc: string; icon: LucideIcon; red?: boolean }[] = [
   { to: '/admin/users', label: 'Manage Users', desc: 'Approve new accounts and set roles', icon: Users },
@@ -10,10 +12,39 @@ const links: { to: string; label: string; desc: string; icon: LucideIcon; red?: 
 ]
 
 export default function AdminHome() {
+  const [incidentCount, setIncidentCount] = useState(0)
+
+  useEffect(() => {
+    // Count reports submitted in the last 7 days as "new"
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    supabase
+      .from('incident_reports')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', since)
+      .then(({ count }) => setIncidentCount(count ?? 0))
+  }, [])
+
   return (
     <div>
       <h1 className="text-xl font-bold text-gray-900 mb-1">Admin</h1>
       <p className="text-sm text-gray-500 mb-4">Manage users, documents, and sign requests.</p>
+
+      {incidentCount > 0 && (
+        <Link
+          to="/admin/incidents"
+          className="flex items-center gap-3 bg-red-600 text-white rounded-xl p-4 mb-4 shadow-md animate-pulse"
+        >
+          <AlertTriangle size={22} className="shrink-0" />
+          <div className="flex-1">
+            <p className="font-bold text-sm">
+              {incidentCount} Incident Report{incidentCount !== 1 ? 's' : ''} in the last 7 days
+            </p>
+            <p className="text-red-100 text-xs">Tap to view and review</p>
+          </div>
+          <ChevronRight size={18} className="shrink-0 text-red-200" />
+        </Link>
+      )}
+
       <div className="space-y-2">
         {links.map((l) => (
           <Link
@@ -25,7 +56,14 @@ export default function AdminHome() {
               <l.icon size={20} />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-gray-800">{l.label}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-gray-800">{l.label}</p>
+                {l.red && incidentCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                    {incidentCount}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-500">{l.desc}</p>
             </div>
             <ChevronRight size={18} className="text-gray-300 shrink-0" />

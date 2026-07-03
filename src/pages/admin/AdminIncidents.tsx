@@ -42,6 +42,7 @@ function PrintView({ report }: { report: IncidentReport }) {
       <div className="grid grid-cols-2 gap-x-8 gap-y-3">
         {[
           ['Reporter', d.reporter_name],
+          ['Phone', d.reporter_phone],
           ['Date of Incident', d.incident_date],
           ['Time', d.incident_time],
           ['Location', d.location],
@@ -199,7 +200,8 @@ export default function AdminIncidents() {
               {isOpen && (
                 <div className="border-t border-gray-100 px-4 pb-4">
                   <div className="mt-3 space-y-0">
-                    <Row label="Description" value={d.description} />
+                    <Row label="Reporter Phone" value={d.reporter_phone} />
+                  <Row label="Description" value={d.description} />
                     <Row label="Persons Involved" value={d.persons_involved} />
                     <Row label="Witnesses" value={d.witnesses} />
                     <Row label="Injury / Illness Details" value={d.injury_details} />
