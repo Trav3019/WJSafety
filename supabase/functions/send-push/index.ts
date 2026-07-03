@@ -69,6 +69,34 @@ Deno.serve(async (req) => {
     const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
     if (adminIds.length === 0) return new Response('no admins', { status: 200 })
     query = query.in('user_id', adminIds)
+  } else if (payload.type === 'daily_pending_reminder') {
+    const { data: pending } = await supabase
+      .from('sign_assignments')
+      .select('assigned_to, sign_requests(title)')
+      .eq('status', 'pending')
+
+    const byWorker: Record<string, string[]> = {}
+    for (const a of (pending ?? []) as { assigned_to: string; sign_requests: { title: string } }[]) {
+      if (!byWorker[a.assigned_to]) byWorker[a.assigned_to] = []
+      byWorker[a.assigned_to].push(a.sign_requests.title)
+    }
+
+    let notified = 0
+    for (const [userId, titles] of Object.entries(byWorker)) {
+      const { data: workerSubs } = await supabase.from('push_subscriptions').select('*').eq('user_id', userId)
+      const count = titles.length
+      const notifBody = titles.slice(0, 2).join(', ') + (count > 2 ? ` and ${count - 2} more` : '')
+      await Promise.allSettled(
+        (workerSubs ?? []).map((sub) =>
+          webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            JSON.stringify({ title: `You have ${count} unsigned document${count > 1 ? 's' : ''}`, body: notifBody }),
+          )
+        )
+      )
+      notified++
+    }
+    return new Response(JSON.stringify({ notified }), { headers: { 'Content-Type': 'application/json' } })
   } else {
     return new Response('Unknown event type', { status: 400 })
   }

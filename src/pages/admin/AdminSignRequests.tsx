@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Upload, Users, CheckCircle2, Clock, ChevronRight, Search, X } from 'lucide-react'
+import { ArrowLeft, Upload, Users, CheckCircle2, Clock, ChevronRight, Search, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import type { Profile } from '../../lib/types'
@@ -140,6 +140,13 @@ export default function AdminSignRequests() {
     if (fileRef.current) fileRef.current.value = ''
     setMessage(`Sent to ${targets.length} worker(s).`)
     setUploading(false)
+    load()
+  }
+
+  async function deleteRequest(req: SignRequest) {
+    if (!confirm(`Delete "${req.title}"? This cannot be undone.`)) return
+    await supabase.from('sign_requests').delete().eq('id', req.id)
+    await supabase.storage.from('sign-pdfs').remove([req.pdf_path])
     load()
   }
 
@@ -334,6 +341,12 @@ export default function AdminSignRequests() {
                       )}
                     </div>
                   ))}
+                  <button
+                    onClick={() => deleteRequest(req)}
+                    className="mt-1 flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-medium"
+                  >
+                    <Trash2 size={12} /> Delete request
+                  </button>
                 </div>
               )}
             </div>
