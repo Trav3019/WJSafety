@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle, ChevronDown, ChevronUp, Printer, Trash2, UserRound, CheckCircle2, Eye } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
@@ -96,6 +96,8 @@ function PrintView({ report }: { report: IncidentReport }) {
 function WorkerIncidents() {
   const { workerId } = useParams()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const base = pathname.startsWith('/manager') ? '/manager' : '/admin'
   const [workerName, setWorkerName] = useState('')
   const [workerRole, setWorkerRole] = useState('')
   const [reports, setReports] = useState<IncidentReport[]>([])
@@ -144,7 +146,7 @@ function WorkerIncidents() {
       {printTarget && <PrintView report={printTarget} />}
 
       <button
-        onClick={() => navigate('/admin/incidents')}
+        onClick={() => navigate(`${base}/incidents`)}
         className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium"
       >
         <ArrowLeft size={15} />
@@ -281,6 +283,8 @@ function WorkerIncidents() {
 export default function AdminIncidents() {
   const { workerId } = useParams()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const base = pathname.startsWith('/manager') ? '/manager' : '/admin'
   const [workers, setWorkers] = useState<WorkerSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -324,9 +328,9 @@ export default function AdminIncidents() {
 
   return (
     <div>
-      <Link to="/admin" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
+      <Link to={base} className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
         <ArrowLeft size={15} />
-        Admin
+        {base === '/manager' ? 'Manager' : 'Admin'}
       </Link>
       <div className="flex items-center gap-2 mb-1">
         <AlertTriangle size={20} className="text-red-600" />
@@ -350,7 +354,7 @@ export default function AdminIncidents() {
         {workers.map((w) => (
           <button
             key={w.id}
-            onClick={() => navigate(`/admin/incidents/${w.id}`)}
+            onClick={() => navigate(`${base}/incidents/${w.id}`)}
             className={`w-full bg-white border rounded-xl shadow-sm p-3.5 flex items-center gap-3 hover:shadow-md transition-all text-left ${
               w.unreviewed > 0 ? 'border-red-200 hover:border-red-300' : 'border-gray-100 hover:border-emerald-300'
             }`}

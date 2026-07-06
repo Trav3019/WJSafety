@@ -26,7 +26,7 @@ async function syncAllDocumentsOffline() {
 }
 
 export default function Layout() {
-  const { profile, isAdmin, signOut } = useAuth()
+  const { profile, isAdmin, isManager, signOut } = useAuth()
   const [showNotifHistory, setShowNotifHistory] = useState(false)
 
   useEffect(() => {
@@ -105,6 +105,23 @@ export default function Layout() {
                 <>
                   <ShieldCheck size={20} strokeWidth={isActive ? 2.4 : 2} />
                   Admin
+                </>
+              )}
+            </NavLink>
+          )}
+          {isManager && (
+            <NavLink
+              to="/manager"
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-0.5 text-xs px-4 py-1.5 rounded-lg min-w-16 font-medium transition-colors ${
+                  isActive ? 'text-emerald-700 bg-emerald-50' : 'text-gray-500'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <ShieldCheck size={20} strokeWidth={isActive ? 2.4 : 2} />
+                  Manager
                 </>
               )}
             </NavLink>

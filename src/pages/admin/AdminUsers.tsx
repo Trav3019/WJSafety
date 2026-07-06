@@ -69,6 +69,7 @@ export default function AdminUsers() {
                 className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               >
                 <option value="worker">Worker</option>
+                <option value="manager">Manager</option>
                 <option value="safety_officer">Safety Officer</option>
                 <option value="admin">Admin</option>
               </select>

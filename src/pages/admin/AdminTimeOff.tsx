@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Check, X, UserRound, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
@@ -200,6 +200,8 @@ function DayPanel({
 
 export default function AdminTimeOff() {
   const { profile } = useAuth()
+  const { pathname } = useLocation()
+  const base = pathname.startsWith('/manager') ? '/manager' : '/admin'
   const [requests, setRequests] = useState<TimeOffRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'pending' | 'all'>('pending')
@@ -249,9 +251,9 @@ export default function AdminTimeOff() {
 
   return (
     <div>
-      <Link to="/admin" className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
+      <Link to={base} className="text-emerald-700 text-sm mb-3 inline-flex items-center gap-1 font-medium">
         <ArrowLeft size={15} />
-        Admin
+        {base === '/manager' ? 'Manager' : 'Admin'}
       </Link>
       <div className="flex items-center gap-2 mb-1">
         <CalendarDays size={20} className="text-emerald-700" />

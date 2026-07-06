@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
-import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute'
+import { ProtectedRoute, AdminRoute, ManagerRoute } from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -19,6 +19,7 @@ import AdminSignRequests from './pages/admin/AdminSignRequests'
 import AdminWorkerFiles from './pages/admin/AdminWorkerFiles'
 import AdminIncidents from './pages/admin/AdminIncidents'
 import AdminTimeOff from './pages/admin/AdminTimeOff'
+import ManagerHome from './pages/manager/ManagerHome'
 import SignDoc from './pages/SignDoc'
 import IncidentReport from './pages/IncidentReport'
 import TimeOff from './pages/TimeOff'
@@ -42,6 +43,13 @@ function App() {
               <Route path="/sign/:assignmentId" element={<SignDoc />} />
               <Route path="/incident-report" element={<IncidentReport />} />
               <Route path="/time-off" element={<TimeOff />} />
+
+              <Route element={<ManagerRoute />}>
+                <Route path="/manager" element={<ManagerHome />} />
+                <Route path="/manager/incidents" element={<AdminIncidents />} />
+                <Route path="/manager/incidents/:workerId" element={<AdminIncidents />} />
+                <Route path="/manager/time-off" element={<AdminTimeOff />} />
+              </Route>
 
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminHome />} />
