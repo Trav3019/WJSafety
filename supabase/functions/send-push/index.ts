@@ -99,6 +99,17 @@ Deno.serve(async (req) => {
     const adminIds = (adminProfiles ?? []).map((p: { id: string }) => p.id)
     if (adminIds.length === 0) return new Response('no admins', { status: 200 })
     query = query.in('user_id', adminIds)
+  } else if (payload.type === 'time_off_request') {
+    title = `Time off request from ${payload.worker_name}`
+    body = payload.date_range
+    const userIds: string[] = payload.user_ids ?? []
+    if (userIds.length === 0) return new Response('no recipients', { status: 200 })
+    query = query.in('user_id', userIds)
+  } else if (payload.type === 'time_off_decision') {
+    const approved = payload.status === 'approved'
+    title = approved ? `Time off approved: ${payload.date_range}` : `Time off declined: ${payload.date_range}`
+    body = approved ? 'Your time off request has been approved.' : 'Your request was not approved. Contact your manager.'
+    query = query.eq('user_id', payload.user_id)
   } else if (payload.type === 'daily_pending_reminder') {
     const { data: pending } = await supabase
       .from('sign_assignments')

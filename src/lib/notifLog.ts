@@ -15,3 +15,9 @@ export async function getAdminIds(): Promise<string[]> {
   const { data } = await supabase.from('profiles').select('id').eq('role', 'admin')
   return (data ?? []).map((p: { id: string }) => p.id)
 }
+
+// Fetch admin + manager IDs (for time-off notifications)
+export async function getAdminAndManagerIds(): Promise<string[]> {
+  const { data } = await supabase.from('profiles').select('id, role').in('role', ['admin', 'manager'])
+  return (data ?? []).map((p: { id: string }) => p.id)
+}

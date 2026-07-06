@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Check, X, UserRound, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { logNotif } from '../../lib/notifLog'
 
 interface TimeOffRequest {
   id: string
@@ -234,6 +235,24 @@ export default function AdminTimeOff() {
       reviewed_at: new Date().toISOString(),
     }).eq('id', id)
     setRequests((r) => r.map((x) => x.id === id ? { ...x, status } : x))
+
+    // Notify the worker
+    const req = requests.find((x) => x.id === id)
+    if (req) {
+      const dateRange = req.start_date === req.end_date
+        ? fmtDate(req.start_date)
+        : `${fmtDate(req.start_date)} → ${fmtDate(req.end_date)}`
+      const title = status === 'approved'
+        ? `Time off approved: ${dateRange}`
+        : `Time off request declined: ${dateRange}`
+      const body = status === 'approved'
+        ? 'Your time off request has been approved.'
+        : 'Your time off request was not approved. Please contact your manager.'
+      logNotif(req.user_id, title, body)
+      supabase.functions.invoke('Send-Push', {
+        body: { type: 'time_off_decision', user_id: req.user_id, status, date_range: dateRange },
+      })
+    }
   }
 
   async function deleteRequest(id: string) {

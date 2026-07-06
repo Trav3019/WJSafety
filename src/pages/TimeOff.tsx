@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CalendarDays, Plus, X, Check, Clock, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { logNotif, getAdminAndManagerIds } from '../lib/notifLog'
 
 interface TimeOffRequest {
   id: string
@@ -63,6 +64,17 @@ export default function TimeOff() {
       end_date: form.end_date,
       reason: form.reason || null,
     })
+
+    // Notify admins and managers
+    const dateRange = form.start_date === form.end_date
+      ? fmt(form.start_date)
+      : `${fmt(form.start_date)} → ${fmt(form.end_date)}`
+    const ids = await getAdminAndManagerIds()
+    logNotif(ids, `Time off request from ${profile.full_name}`, dateRange + (form.reason ? ` · ${form.reason}` : ''))
+    supabase.functions.invoke('Send-Push', {
+      body: { type: 'time_off_request', worker_name: profile.full_name, date_range: dateRange, user_ids: ids },
+    })
+
     setForm({ start_date: '', end_date: '', reason: '' })
     setShowForm(false)
     setSubmitting(false)
