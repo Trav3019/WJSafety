@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Send, AlertTriangle, Camera, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { logNotif, getAdminIds } from '../lib/notifLog'
@@ -30,6 +30,8 @@ export default function IncidentReport() {
   const [hasSig, setHasSig] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [photos, setPhotos] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
 
   // Size canvas to its displayed size and wire up non-passive touch events
   useEffect(() => {
@@ -113,6 +115,20 @@ export default function IncidentReport() {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
+  function addPhotos(files: FileList | null) {
+    if (!files) return
+    const newFiles = Array.from(files).slice(0, 5 - photos.length)
+    const newPreviews = newFiles.map((f) => URL.createObjectURL(f))
+    setPhotos((p) => [...p, ...newFiles])
+    setPhotoPreviews((p) => [...p, ...newPreviews])
+  }
+
+  function removePhoto(i: number) {
+    URL.revokeObjectURL(photoPreviews[i])
+    setPhotos((p) => p.filter((_, idx) => idx !== i))
+    setPhotoPreviews((p) => p.filter((_, idx) => idx !== i))
+  }
+
   function clearSig() {
     const canvas = sigCanvasRef.current!
     canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height)
@@ -129,12 +145,25 @@ export default function IncidentReport() {
 
     const signature_data_url = hasSig ? sigCanvasRef.current!.toDataURL() : null
 
+    // Upload photos to storage
+    const photoUrls: string[] = []
+    for (const file of photos) {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `incident-photos/${profile?.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, { upsert: false })
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
+        photoUrls.push(urlData.publicUrl)
+      }
+    }
+
     const { error } = await supabase.from('incident_reports').insert({
       submitted_by: profile?.id,
       data: {
         ...form,
         reporter_name: profile?.full_name,
         signature_data_url,
+        photo_urls: photoUrls.length ? photoUrls : undefined,
       },
     })
 
@@ -253,6 +282,43 @@ export default function IncidentReport() {
           <Field label="Corrective Actions Taken">
             <textarea className={textareaCls} rows={2} placeholder="What was done immediately to prevent recurrence?" value={form.corrective_actions} onChange={(e) => set('corrective_actions', e.target.value)} />
           </Field>
+        </div>
+
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 space-y-3">
+          <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Photos</h2>
+          <p className="text-xs text-gray-400">Attach up to 5 photos of the incident scene or injuries.</p>
+
+          {photoPreviews.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {photoPreviews.map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={src} alt={`Photo ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(i)}
+                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {photos.length < 5 && (
+            <label className="flex items-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl px-3 py-2 cursor-pointer transition-colors w-fit">
+              <Camera size={16} />
+              {photos.length === 0 ? 'Add Photos' : 'Add More'}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                capture="environment"
+                className="sr-only"
+                onChange={(e) => addPhotos(e.target.files)}
+              />
+            </label>
+          )}
         </div>
 
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 space-y-3">

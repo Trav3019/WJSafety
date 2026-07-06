@@ -1,26 +1,32 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, UploadCloud, ChevronRight, FileSignature, FolderOpen, AlertTriangle, type LucideIcon } from 'lucide-react'
+import { Users, UploadCloud, ChevronRight, FileSignature, FolderOpen, AlertTriangle, CalendarDays, type LucideIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
-const links: { to: string; label: string; desc: string; icon: LucideIcon; red?: boolean }[] = [
+const links: { to: string; label: string; desc: string; icon: LucideIcon; red?: boolean; amber?: boolean }[] = [
   { to: '/admin/users', label: 'Manage Users', desc: 'Approve new accounts and set roles', icon: Users },
   { to: '/admin/documents', label: 'Upload Documents', desc: 'Add SDS, plans, inventories and more', icon: UploadCloud },
   { to: '/admin/sign-requests', label: 'PDF Sign Requests', desc: 'Upload a PDF and send it to workers to sign', icon: FileSignature },
   { to: '/admin/worker-files', label: 'Worker Files', desc: 'View completed documents per employee', icon: FolderOpen },
   { to: '/admin/incidents', label: 'Incident Reports', desc: 'View and print incident reports submitted by workers', icon: AlertTriangle, red: true },
+  { to: '/admin/time-off', label: 'Time Off Requests', desc: 'Approve or reject time off requests and view the calendar', icon: CalendarDays, amber: true },
 ]
 
 export default function AdminHome() {
   const [incidentCount, setIncidentCount] = useState(0)
+  const [timeOffCount, setTimeOffCount] = useState(0)
 
   useEffect(() => {
-    // Count unreviewed reports
     supabase
       .from('incident_reports')
       .select('id', { count: 'exact', head: true })
       .is('reviewed_at', null)
       .then(({ count }) => setIncidentCount(count ?? 0))
+    supabase
+      .from('time_off_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setTimeOffCount(count ?? 0))
   }, [])
 
   return (
@@ -51,7 +57,7 @@ export default function AdminHome() {
             to={l.to}
             className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-3 hover:border-emerald-300 hover:shadow-md transition-all"
           >
-            <div className={`${l.red ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'} rounded-full p-2.5 shrink-0`}>
+            <div className={`${l.red ? 'bg-red-50 text-red-600' : l.amber ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'} rounded-full p-2.5 shrink-0`}>
               <l.icon size={20} />
             </div>
             <div className="flex-1">
@@ -60,6 +66,11 @@ export default function AdminHome() {
                 {l.red && incidentCount > 0 && (
                   <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
                     {incidentCount}
+                  </span>
+                )}
+                {l.amber && timeOffCount > 0 && (
+                  <span className="bg-amber-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                    {timeOffCount}
                   </span>
                 )}
               </div>

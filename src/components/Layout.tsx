@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Home, FileText, ClipboardCheck, ShieldCheck, LogOut, Bell, AlertTriangle } from 'lucide-react'
+import { Home, FileText, ClipboardCheck, ShieldCheck, LogOut, Bell, AlertTriangle, CalendarDays } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import NotificationPrompt from './NotificationPrompt'
 import NotificationHistory from './NotificationHistory'
@@ -9,8 +9,9 @@ import { cacheFile, isCached } from '../lib/offlineDb'
 
 const navItems = [
   { to: '/', label: 'Home', icon: Home },
-  { to: '/documents', label: 'Documents', icon: FileText },
+  { to: '/documents', label: 'Docs', icon: FileText },
   { to: '/forms', label: 'Forms', icon: ClipboardCheck },
+  { to: '/time-off', label: 'Time Off', icon: CalendarDays },
   { to: '/incident-report', label: 'Report', icon: AlertTriangle },
 ]
 

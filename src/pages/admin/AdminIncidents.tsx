@@ -221,6 +221,19 @@ function WorkerIncidents() {
                     <Row label="Corrective Actions Taken" value={d.corrective_actions} />
                   </div>
 
+                  {Array.isArray(d.photo_urls) && d.photo_urls.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold text-gray-500 mb-1">Photos</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {(d.photo_urls as string[]).map((url: string, i: number) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                            <img src={url} alt={`Photo ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {d.signature_data_url && (
                     <div className="mt-3">
                       <p className="text-xs font-semibold text-gray-500 mb-1">Signature</p>
