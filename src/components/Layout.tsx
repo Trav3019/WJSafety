@@ -11,7 +11,7 @@ const navItems = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/documents', label: 'Docs', icon: FileText },
   { to: '/forms', label: 'Forms', icon: ClipboardCheck },
-  { to: '/time-off', label: 'Time Off', icon: CalendarDays },
+  { to: '/time-off', label: 'Leave', icon: CalendarDays },
   { to: '/incident-report', label: 'Report', icon: AlertTriangle },
 ]
 

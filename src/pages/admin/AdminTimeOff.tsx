@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Check, X, UserRound } from 'lucide-react'
+import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Check, X, UserRound, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
@@ -21,22 +21,36 @@ const statusStyle = {
   rejected: 'bg-red-100 text-red-700',
 }
 
-function fmt(d: string) {
+function fmtDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
 }
 
-// ── Mini calendar ──────────────────────────────────────────────────────────────
+function fmtFull(d: string) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
-function Calendar({ requests }: { requests: TimeOffRequest[] }) {
+function dateStr(y: number, m: number, d: number) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+
+function Calendar({
+  requests,
+  selectedDay,
+  onSelect,
+}: {
+  requests: TimeOffRequest[]
+  selectedDay: string | null
+  onSelect: (day: string) => void
+}) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
 
   const monthName = new Date(year, month).toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' })
-
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  // Sun=0 → Mon first: shift
   const startPad = (firstDay + 6) % 7
 
   function prev() {
@@ -46,7 +60,6 @@ function Calendar({ requests }: { requests: TimeOffRequest[] }) {
     if (month === 11) { setMonth(0); setYear(y => y + 1) } else setMonth(m => m + 1)
   }
 
-  // Build set of days with approved / pending requests
   const approved = new Set<number>()
   const pending = new Set<number>()
 
@@ -66,7 +79,6 @@ function Calendar({ requests }: { requests: TimeOffRequest[] }) {
     ...Array(startPad).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ]
-  // pad to full rows
   while (cells.length % 7 !== 0) cells.push(null)
 
   const todayDay = today.getFullYear() === year && today.getMonth() === month ? today.getDate() : null
@@ -84,7 +96,7 @@ function Calendar({ requests }: { requests: TimeOffRequest[] }) {
       </div>
 
       <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
-        {['M','T','W','T','F','S','S'].map((d, i) => (
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
           <div key={i} className="text-xs font-semibold text-gray-400 py-1">{d}</div>
         ))}
       </div>
@@ -92,25 +104,36 @@ function Calendar({ requests }: { requests: TimeOffRequest[] }) {
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {cells.map((day, i) => {
           if (!day) return <div key={i} />
-          const isToday = day === todayDay
+          const ds = dateStr(year, month, day)
+          const isSelected = ds === selectedDay
           const isApproved = approved.has(day)
           const isPending = pending.has(day)
+          const isToday = day === todayDay
+          const hasActivity = isApproved || isPending
+
           return (
-            <div
+            <button
               key={i}
-              className={`rounded-lg py-1.5 text-xs font-medium relative ${
+              onClick={() => onSelect(ds)}
+              className={`rounded-lg py-1.5 text-xs font-medium relative transition-colors ${
+                isSelected
+                  ? 'ring-2 ring-emerald-600 ring-offset-1'
+                  : ''
+              } ${
                 isApproved
                   ? 'bg-emerald-100 text-emerald-800'
                   : isPending
                     ? 'bg-amber-100 text-amber-800'
                     : isToday
                       ? 'bg-gray-100 text-gray-800'
-                      : 'text-gray-700'
+                      : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
               {day}
-              {isToday && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-600 rounded-full" />}
-            </div>
+              {isToday && !hasActivity && (
+                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-600 rounded-full" />
+              )}
+            </button>
           )
         })}
       </div>
@@ -118,7 +141,57 @@ function Calendar({ requests }: { requests: TimeOffRequest[] }) {
       <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-100 inline-block" />Approved</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-100 inline-block" />Pending</span>
+        <span className="flex items-center gap-1.5 ml-auto text-gray-400 italic">Tap a day to see who's off</span>
       </div>
+    </div>
+  )
+}
+
+// ── Day detail panel ──────────────────────────────────────────────────────────
+
+function DayPanel({
+  day,
+  requests,
+  onClose,
+}: {
+  day: string
+  requests: TimeOffRequest[]
+  onClose: () => void
+}) {
+  const onDay = requests.filter((r) => r.start_date <= day && r.end_date >= day)
+
+  return (
+    <div className="bg-white border border-emerald-100 rounded-2xl shadow-sm p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="font-semibold text-gray-800 text-sm">{fmtFull(day)}</p>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <X size={16} />
+        </button>
+      </div>
+
+      {onDay.length === 0 ? (
+        <p className="text-sm text-gray-400">Nobody is off on this day.</p>
+      ) : (
+        <div className="space-y-2">
+          {onDay.map((r) => (
+            <div key={r.id} className="flex items-center gap-3">
+              <div className="bg-emerald-50 text-emerald-700 rounded-full p-1.5 shrink-0">
+                <UserRound size={14} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800">{r.profiles?.full_name ?? 'Unknown'}</p>
+                <p className="text-xs text-gray-500">
+                  {fmtDate(r.start_date)}{r.end_date !== r.start_date ? ` → ${fmtDate(r.end_date)}` : ''}
+                  {r.reason ? ` · ${r.reason}` : ''}
+                </p>
+              </div>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 capitalize ${statusStyle[r.status]}`}>
+                {r.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -130,6 +203,7 @@ export default function AdminTimeOff() {
   const [requests, setRequests] = useState<TimeOffRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'pending' | 'all'>('pending')
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   async function load() {
     const { data: reqs } = await supabase
@@ -160,6 +234,16 @@ export default function AdminTimeOff() {
     setRequests((r) => r.map((x) => x.id === id ? { ...x, status } : x))
   }
 
+  async function deleteRequest(id: string) {
+    if (!confirm('Delete this time off request?')) return
+    await supabase.from('time_off_requests').delete().eq('id', id)
+    setRequests((r) => r.filter((x) => x.id !== id))
+  }
+
+  function handleDaySelect(day: string) {
+    setSelectedDay((prev) => prev === day ? null : day)
+  }
+
   const displayed = tab === 'pending' ? requests.filter((r) => r.status === 'pending') : requests
   const pendingCount = requests.filter((r) => r.status === 'pending').length
 
@@ -177,7 +261,11 @@ export default function AdminTimeOff() {
         {pendingCount > 0 ? `${pendingCount} pending request${pendingCount !== 1 ? 's' : ''}` : 'No pending requests'}
       </p>
 
-      <Calendar requests={requests} />
+      <Calendar requests={requests} selectedDay={selectedDay} onSelect={handleDaySelect} />
+
+      {selectedDay && (
+        <DayPanel day={selectedDay} requests={requests} onClose={() => setSelectedDay(null)} />
+      )}
 
       <div className="flex rounded-xl overflow-hidden border border-gray-200 mb-4">
         <button
@@ -213,7 +301,7 @@ export default function AdminTimeOff() {
                 <p className="font-medium text-gray-800 text-sm">{r.profiles?.full_name ?? 'Unknown'}</p>
                 <p className="text-xs text-gray-500 capitalize">{r.profiles?.role}</p>
                 <p className="text-sm text-gray-700 mt-1 font-medium">
-                  {fmt(r.start_date)}{r.end_date !== r.start_date ? ` → ${fmt(r.end_date)}` : ''}
+                  {fmtDate(r.start_date)}{r.end_date !== r.start_date ? ` → ${fmtDate(r.end_date)}` : ''}
                 </p>
                 {r.reason && <p className="text-xs text-gray-500 mt-0.5">{r.reason}</p>}
               </div>
@@ -222,24 +310,33 @@ export default function AdminTimeOff() {
               </span>
             </div>
 
-            {r.status === 'pending' && (
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => setStatus(r.id, 'approved')}
-                  className="flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2.5 py-1.5 font-medium transition-colors"
-                >
-                  <Check size={13} />
-                  Approve
-                </button>
-                <button
-                  onClick={() => setStatus(r.id, 'rejected')}
-                  className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg px-2.5 py-1.5 font-medium transition-colors"
-                >
-                  <X size={13} />
-                  Reject
-                </button>
-              </div>
-            )}
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {r.status === 'pending' && (
+                <>
+                  <button
+                    onClick={() => setStatus(r.id, 'approved')}
+                    className="flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-2.5 py-1.5 font-medium transition-colors"
+                  >
+                    <Check size={13} />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => setStatus(r.id, 'rejected')}
+                    className="flex items-center gap-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg px-2.5 py-1.5 font-medium transition-colors"
+                  >
+                    <X size={13} />
+                    Reject
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => deleteRequest(r.id)}
+                className="ml-auto flex items-center gap-1 text-xs text-red-500 hover:bg-red-50 rounded-lg px-2.5 py-1.5 font-medium transition-colors"
+              >
+                <Trash2 size={13} />
+                Delete
+              </button>
+            </div>
           </div>
         ))}
       </div>
